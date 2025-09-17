@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Inventory Report</h2>
+
+    <!-- Filter Section -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-select" id="category" name="category">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if selected_category == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="stock_status" class="form-label">Stock Status</label>
+                    <select class="form-select" id="stock_status" name="stock_status">
+                        <option value="">All</option>
+                        <option value="low" {% if stock_status == 'low' %}selected{% endif %}>Low Stock</option>
+                        <option value="out" {% if stock_status == 'out' %}selected{% endif %}>Out of Stock</option>
+                        <option value="normal" {% if stock_status == 'normal' %}selected{% endif %}>Normal</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">Filter</button>
+                    <a href="{% url 'dashboard:inventory-report-export' %}?category={{ selected_category }}&stock_status={{ stock_status }}" class="btn btn-success">Export CSV</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Products</h5>
+                    <p class="card-text h3">{{ summary.total_products }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Low Stock Items</h5>
+                    <p class="card-text h3">{{ summary.low_stock_count }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Out of Stock</h5>
+                    <p class="card-text h3">{{ summary.out_of_stock_count }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Stock Value</h5>
+                    <p class="card-text h3">₱{{ summary.total_value|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Distribution Chart -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <canvas id="stockDistributionChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Inventory Table -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Inventory Details</h5>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th>Current Stock</th>
+                            <th>Low Stock Threshold</th>
+                            <th>Unit Price</th>
+                            <th>Total Value</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in inventory %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.product.category.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ item.low_stock_threshold }}</td>
+                            <td>₱{{ item.product.price|floatformat:2 }}</td>
+                            <td>₱{{ item.total_value|floatformat:2 }}</td>
+                            <td>
+                                {% if item.quantity == 0 %}
+                                <span class="badge bg-danger">Out of Stock</span>
+                                {% elif item.quantity <= item.low_stock_threshold %}
+                                <span class="badge bg-warning">Low Stock</span>
+                                {% else %}
+                                <span class="badge bg-success">Normal</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if inventory.has_other_pages %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if inventory.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ inventory.previous_page_number }}&category={{ selected_category }}&stock_status={{ stock_status }}">Previous</a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in inventory.paginator.page_range %}
+                    <li class="page-item {% if inventory.number == num %}active{% endif %}">
+                        <a class="page-link" href="?page={{ num }}&category={{ selected_category }}&stock_status={{ stock_status }}">{{ num }}</a>
+                    </li>
+                    {% endfor %}
+                    
+                    {% if inventory.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ inventory.next_page_number }}&category={{ selected_category }}&stock_status={{ stock_status }}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('stockDistributionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ chart_data.labels|safe }},
+            datasets: [{
+                data: {{ chart_data.values|safe }},
+                backgroundColor: [
+                    'rgb(75, 192, 192)',
+                    'rgb(255, 205, 86)',
+                    'rgb(255, 99, 132)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Stock Distribution'
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

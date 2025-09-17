@@ -1,0 +1,82 @@
+/* Dashboard Cards */
+.card {
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+/* Product Cards in POS */
+.pos-product-card {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pos-product-card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Custom Styles for Tables */
+.table th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Stock Status Indicators */
+.stock-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.stock-status.low {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.stock-status.out {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.stock-status.good {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+/* Custom Form Styling */
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* Navigation Improvements */
+.navbar .nav-link {
+    padding: 0.5rem 1rem;
+    transition: color 0.2s;
+}
+
+.navbar .nav-link:hover {
+    color: rgba(255,255,255,0.9);
+}
+
+/* Dashboard Chart Container */
+.chart-container {
+    position: relative;
+    margin: auto;
+    height: 300px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .table-responsive {
+        margin: 0 -1rem;
+    }
+}

@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sales Report - Kids Store{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.css" rel="stylesheet">
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 2rem;
+    }
+    .report-filters {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Report Filters -->
+<div class="report-filters">
+    <form method="get" class="row g-3">
+        <div class="col-md-3">
+            <label for="start_date" class="form-label">Start Date</label>
+            <input type="date" class="form-control" id="start_date" name="start_date" 
+                   value="{{ request.GET.start_date }}">
+        </div>
+        <div class="col-md-3">
+            <label for="end_date" class="form-label">End Date</label>
+            <input type="date" class="form-control" id="end_date" name="end_date"
+                   value="{{ request.GET.end_date }}">
+        </div>
+        <div class="col-md-3">
+            <label for="report_type" class="form-label">Report Type</label>
+            <select class="form-select" id="report_type" name="report_type">
+                <option value="daily" {% if report_type == 'daily' %}selected{% endif %}>Daily</option>
+                <option value="weekly" {% if report_type == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="monthly" {% if report_type == 'monthly' %}selected{% endif %}>Monthly</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <div>
+                <button type="submit" class="btn btn-primary">Generate Report</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="exportReport()">
+                    Export CSV
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Sales Summary -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Sales Summary</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <h6 class="text-muted">Total Sales</h6>
+                <h3>${{ summary.total_sales|floatformat:2 }}</h3>
+            </div>
+            <div class="col-md-3">
+                <h6 class="text-muted">Total Orders</h6>
+                <h3>{{ summary.total_orders }}</h3>
+            </div>
+            <div class="col-md-3">
+                <h6 class="text-muted">Average Order Value</h6>
+                <h3>${{ summary.avg_order_value|floatformat:2 }}</h3>
+            </div>
+            <div class="col-md-3">
+                <h6 class="text-muted">Items Sold</h6>
+                <h3>{{ summary.items_sold }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sales Trend Chart -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Sales Trend</h5>
+    </div>
+    <div class="card-body">
+        <div class="chart-container">
+            <canvas id="salesTrendChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Sales by Category -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Sales by Category</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Top Products</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="text-end">Quantity</th>
+                                <th class="text-end">Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in top_products %}
+                            <tr>
+                                <td>{{ product.name }}</td>
+                                <td class="text-end">{{ product.quantity }}</td>
+                                <td class="text-end">${{ product.revenue|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Sales Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Detailed Sales</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th class="text-end">Total</th>
+                        <th>Payment</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>{{ order.order_date|date:"M d, Y H:i" }}</td>
+                        <td>
+                            <a href="{% url 'sales:order-detail' order.id %}">#{{ order.id }}</a>
+                        </td>
+                        <td>{{ order.customer.name }}</td>
+                        <td>{{ order.orderitem_set.count }}</td>
+                        <td class="text-end">${{ order.total|floatformat:2 }}</td>
+                        <td>{{ order.transaction.get_payment_method_display }}</td>
+                        <td>
+                            <span class="badge bg-{{ order.status }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Sales Trend Chart
+    const salesTrendCtx = document.getElementById('salesTrendChart').getContext('2d');
+    new Chart(salesTrendCtx, {
+        type: 'line',
+        data: {
+            labels: {{ sales_trend.dates|safe }},
+            datasets: [{
+                label: 'Sales',
+                data: {{ sales_trend.sales|safe }},
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Category Sales Chart
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    new Chart(categoryCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ category_sales.categories|safe }},
+            datasets: [{
+                data: {{ category_sales.amounts|safe }},
+                backgroundColor: [
+                    'rgb(255, 99, 132)',
+                    'rgb(54, 162, 235)',
+                    'rgb(255, 205, 86)',
+                    'rgb(75, 192, 192)',
+                    'rgb(153, 102, 255)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+});
+
+function exportReport() {
+    // Get current URL parameters
+    const params = new URLSearchParams(window.location.search);
+    params.append('export', 'csv');
+    
+    // Redirect to export URL
+    window.location.href = `${window.location.pathname}?${params.toString()}`;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Product - Kids Store{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Delete Product</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h6 class="alert-heading">Warning!</h6>
+                        <p class="mb-0">Are you sure you want to delete the product "{{ object.name }}"?</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Product Details:</h6>
+                        <dl class="row">
+                            <dt class="col-sm-3">SKU</dt>
+                            <dd class="col-sm-9">{{ object.sku }}</dd>
+
+                            <dt class="col-sm-3">Name</dt>
+                            <dd class="col-sm-9">{{ object.name }}</dd>
+
+                            <dt class="col-sm-3">Price</dt>
+                            <dd class="col-sm-9">৳{{ object.price }}</dd>
+
+                            <dt class="col-sm-3">Category</dt>
+                            <dd class="col-sm-9">{{ object.category.name }}</dd>
+
+                            <dt class="col-sm-3">Brand</dt>
+                            <dd class="col-sm-9">{{ object.brand.name }}</dd>
+
+                            <dt class="col-sm-3">Current Stock</dt>
+                            <dd class="col-sm-9">{{ object.inventory.quantity }}</dd>
+                        </dl>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'inventory:product-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Delete Product
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

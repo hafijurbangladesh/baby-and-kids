@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block title %}Orders - Kids Store{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h4 class="mb-0">Orders</h4>
+            </div>
+            <div class="col-md-6">
+                <form method="get" class="row g-3">
+                    <div class="col-sm-4">
+                        <input type="date" name="start_date" class="form-control" 
+                               value="{{ request.GET.start_date }}" placeholder="Start Date">
+                    </div>
+                    <div class="col-sm-4">
+                        <input type="date" name="end_date" class="form-control" 
+                               value="{{ request.GET.end_date }}" placeholder="End Date">
+                    </div>
+                    <div class="col-sm-4">
+                        <button type="submit" class="btn btn-primary w-100">Filter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Payment</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>#{{ order.id }}</td>
+                        <td>{{ order.order_date|date:"M d, Y H:i" }}</td>
+                        <td>
+                            <a href="{% url 'accounts:customer-detail' order.customer.pk %}" class="text-primary">
+                                {{ order.customer.name }}
+                            </a>
+                        </td>
+                        <td>{{ order.orderitem_set.count }} items</td>
+                        <td>${{ order.total|floatformat:2 }}</td>
+                        <td>
+                            <span class="badge {% if order.status == 'completed' %}bg-success
+                                          {% elif order.status == 'pending' %}bg-warning
+                                          {% else %}bg-danger{% endif %}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if order.transaction %}
+                                {{ order.transaction.get_payment_method_display }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'sales:order-detail' order.pk %}" 
+                                   class="btn btn-info" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <button type="button" class="btn btn-primary" 
+                                        onclick="printReceipt({{ order.pk }})" title="Print">
+                                    <i class="bi bi-printer"></i>
+                                </button>
+                                {% if order.status == 'pending' %}
+                                <button type="button" class="btn btn-success"
+                                        onclick="completeOrder({{ order.pk }})" title="Complete">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                <button type="button" class="btn btn-danger"
+                                        onclick="cancelOrder({{ order.pk }})" title="Cancel">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center">No orders found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% if is_paginated %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">
+                        Previous
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">
+                            {{ num }}
+                        </a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">
+                        Next
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Order Status Change Modal -->
+<div class="modal fade" id="statusChangeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Order Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="statusChangeForm" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p id="statusChangeMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn" id="confirmStatusChange"></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function printReceipt(orderId) {
+    window.open(`/sales/order/${orderId}/print/`, '_blank');
+}
+
+function completeOrder(orderId) {
+    showStatusChangeModal(
+        orderId,
+        'complete',
+        'Are you sure you want to mark this order as completed?',
+        'btn-success',
+        'Complete Order'
+    );
+}
+
+function cancelOrder(orderId) {
+    showStatusChangeModal(
+        orderId,
+        'cancel',
+        'Are you sure you want to cancel this order?',
+        'btn-danger',
+        'Cancel Order'
+    );
+}
+
+function showStatusChangeModal(orderId, action, message, buttonClass, buttonText) {
+    const modal = new bootstrap.Modal(document.getElementById('statusChangeModal'));
+    const form = document.getElementById('statusChangeForm');
+    const messageElement = document.getElementById('statusChangeMessage');
+    const button = document.getElementById('confirmStatusChange');
+    
+    form.action = `/sales/order/${orderId}/${action}/`;
+    messageElement.textContent = message;
+    button.className = `btn ${buttonClass}`;
+    button.textContent = buttonText;
+    
+    modal.show();
+}
+
+// Initialize date range picker if needed
+if (document.querySelector('input[type="date"]')) {
+    const startDate = document.querySelector('input[name="start_date"]');
+    const endDate = document.querySelector('input[name="end_date"]');
+    
+    startDate.addEventListener('change', function() {
+        endDate.min = this.value;
+    });
+    
+    endDate.addEventListener('change', function() {
+        startDate.max = this.value;
+    });
+}
+</script>
+{% endblock %}
