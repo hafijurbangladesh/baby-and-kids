@@ -125,9 +125,13 @@
                         <tbody>
                             {% for product in top_products %}
                             <tr>
-                                <td>{{ product.name }}</td>
-                                <td class="text-end">{{ product.quantity }}</td>
-                                <td class="text-end">${{ product.revenue|floatformat:2 }}</td>
+                                <td>{{ product.product__name }}</td>
+                                <td class="text-end">{{ product.total_quantity }}</td>
+                                <td class="text-end">${{ product.total_sales|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-3 text-muted">No sales data available</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -186,15 +190,25 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Get the data from Django template
+    const salesTrendData = {
+        dates: JSON.parse('{{ sales_trend.dates|escapejs }}'),
+        sales: JSON.parse('{{ sales_trend.sales|escapejs }}')
+    };
+    const categorySalesData = {
+        categories: JSON.parse('{{ category_sales.categories|escapejs }}'),
+        amounts: JSON.parse('{{ category_sales.amounts|escapejs }}')
+    };
+
     // Sales Trend Chart
     const salesTrendCtx = document.getElementById('salesTrendChart').getContext('2d');
     new Chart(salesTrendCtx, {
         type: 'line',
         data: {
-            labels: {{ sales_trend.dates|safe }},
+            labels: salesTrendData.dates,
             datasets: [{
                 label: 'Sales',
-                data: {{ sales_trend.sales|safe }},
+                data: salesTrendData.sales,
                 borderColor: 'rgb(75, 192, 192)',
                 tension: 0.1
             }]
@@ -207,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return '$' + value;
+                            return '$' + value.toLocaleString();
                         }
                     }
                 }
@@ -220,21 +234,44 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(categoryCtx, {
         type: 'pie',
         data: {
-            labels: {{ category_sales.categories|safe }},
+            labels: categorySalesData.categories,
             datasets: [{
-                data: {{ category_sales.amounts|safe }},
+                data: categorySalesData.amounts,
                 backgroundColor: [
                     'rgb(255, 99, 132)',
                     'rgb(54, 162, 235)',
                     'rgb(255, 205, 86)',
                     'rgb(75, 192, 192)',
-                    'rgb(153, 102, 255)'
+                    'rgb(153, 102, 255)',
+                    'rgb(255, 159, 64)',
+                    'rgb(201, 203, 207)',
+                    'rgb(54, 162, 235)'
                 ]
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 20
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed.toLocaleString('en-US', {
+                                style: 'currency',
+                                currency: 'USD'
+                            });
+                            return `${label}: ${value}`;
+                        }
+                    }
+                }
+            }
         }
     });
 });

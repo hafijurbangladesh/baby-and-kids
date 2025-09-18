@@ -16,11 +16,16 @@
     <div class="card-header">
         <form method="get" class="row g-3">
             <div class="col-md-4">
-                <input type="text" name="search" class="form-control" placeholder="Search products..." 
-                       value="{{ request.GET.search }}">
+                <input type="text" name="search" class="form-control" 
+                       placeholder="Search by SKU, name, category, or brand..." 
+                       value="{{ request.GET.search }}"
+                       aria-label="Search products">
+                <div class="form-text">Enter SKU, product name, category, or brand</div>
             </div>
             <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">Search</button>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Search
+                </button>
             </div>
         </form>
     </div>
@@ -33,6 +38,8 @@
                         <th>Name</th>
                         <th>Category</th>
                         <th>Brand</th>
+                        <th>Color</th>
+                        <th>Size</th>
                         <th>Price</th>
                         <th>Stock</th>
                         <th>Actions</th>
@@ -45,6 +52,8 @@
                         <td>{{ product.name }}</td>
                         <td>{{ product.category.get_hierarchy }}</td>
                         <td>{{ product.brand.name }}</td>
+                        <td>{{ product.color.name|default:'-' }}</td>
+                        <td>{{ product.size.name|default:'-' }}</td>
                         <td>৳{{ product.price }}</td>
                         <td>
                             {% with stock=product.inventory.quantity %}

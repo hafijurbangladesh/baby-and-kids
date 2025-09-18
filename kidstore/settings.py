@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-v@$uq998j2p4wkk_imob64t(*+)2&y24c75q4c0dop=j=u^ke)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['https://baby-and-kids.onrender.com/','baby-and-kids.onrender.com','http://baby-and-kids.onrender.com/']
+ALLOWED_HOSTS = ['https://baby-and-kids.onrender.com/','baby-and-kids.onrender.com','http://baby-and-kids.onrender.com/','127.0.0.1']
 CSRF_TRUSTED_ORIGINS = ['https://baby-and-kids.onrender.com','http://baby-and-kids.onrender.com/']
 # Currency settings
 CURRENCY_SYMBOL = '৳'  # Bangladeshi Taka symbol

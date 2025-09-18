@@ -1,5 +1,5 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.urls import reverse_lazy, reverse
 from django.db.models import F
 from django.http import JsonResponse, HttpResponseRedirect
@@ -42,11 +42,31 @@ class ProductListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        queryset = queryset.select_related('category', 'brand', 'supplier')
+        queryset = queryset.select_related('category', 'brand', 'supplier', 'inventory')
+        queryset = queryset.filter(is_active=True)
         search_query = self.request.GET.get('search')
         if search_query:
-            queryset = queryset.filter(name__icontains=search_query)
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(sku__icontains=search_query) |
+                Q(name__icontains=search_query) |
+                Q(category__name__icontains=search_query) |
+                Q(brand__name__icontains=search_query)
+            ).distinct()
         return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Ensure all products have inventory records
+        for product in context['products']:
+            Inventory.objects.get_or_create(
+                product=product,
+                defaults={
+                    'quantity': 0,
+                    'low_stock_threshold': 5
+                }
+            )
+        return context
 
 @login_required
 def product_search(request):
@@ -96,7 +116,15 @@ class ProductDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['inventory'] = self.object.inventory
+        # Create inventory if it doesn't exist
+        inventory, created = Inventory.objects.get_or_create(
+            product=self.object,
+            defaults={
+                'quantity': 0,
+                'low_stock_threshold': 5
+            }
+        )
+        context['inventory'] = inventory
         return context
 
 class ProductCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
@@ -108,7 +136,13 @@ class ProductCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['root_categories'] = Category.objects.filter(parent__isnull=True)
+        # Get all categories ordered by their hierarchy
+        categories = Category.objects.all().order_by('parent__id', 'name')
+        # Convert to list of {id, name, hierarchy} for the template
+        context['categories'] = [
+            {'id': cat.id, 'name': cat.name, 'hierarchy': cat.get_hierarchy()}
+            for cat in categories
+        ]
         return context
 
     def form_valid(self, form):
@@ -129,7 +163,13 @@ class ProductUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['root_categories'] = Category.objects.filter(parent__isnull=True)
+        # Get all categories ordered by their hierarchy
+        categories = Category.objects.all().order_by('parent__id', 'name')
+        # Convert to list of {id, name, hierarchy} for the template
+        context['categories'] = [
+            {'id': cat.id, 'name': cat.name, 'hierarchy': cat.get_hierarchy()}
+            for cat in categories
+        ]
         return context
 
     def get_success_url(self):
@@ -140,6 +180,20 @@ class ProductDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView)
     template_name = 'inventory/product_confirm_delete.html'
     success_url = reverse_lazy('inventory:product-list')
     permission_required = 'inventory.delete_product'
+    
+    def post(self, request, *args, **kwargs):
+        """
+        Override post to handle the deactivation instead of deletion
+        """
+        self.object = self.get_object()
+        self.object.is_active = False
+        self.object.save()
+        
+        from django.contrib import messages
+        messages.success(self.request, f'Product "{self.object.name}" has been deactivated.')
+        
+        success_url = self.get_success_url()
+        return HttpResponseRedirect(success_url)
 
 class LowStockListView(LoginRequiredMixin, ListView):
     model = Inventory
@@ -194,11 +248,8 @@ def update_stock(request, pk):
                     product.inventory.save()
                     product.inventory.refresh_from_db()
                     
-                    return JsonResponse({
-                        'success': True,
-                        'new_quantity': product.inventory.quantity,
-                        'message': f'Stock successfully {"increased" if adjustment > 0 else "decreased"} by {abs(adjustment)}'
-                    })
+                    # Redirect to product list page
+                    return HttpResponseRedirect(reverse('inventory:product-list'))
                     
             return JsonResponse({
                 'error': 'Product has no inventory record'
@@ -212,3 +263,43 @@ def update_stock(request, pk):
     return JsonResponse({
         'error': 'Invalid request method'
     }, status=405)
+
+
+class InventoryReportView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    template_name = 'reports/inventory_report.html'
+    permission_required = 'inventory.view_inventory'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get all products with their inventory
+        products = Product.objects.select_related(
+            'inventory', 'category', 'brand', 'supplier'
+        ).filter(is_active=True)
+
+        # Get low stock products
+        low_stock = products.filter(
+            inventory__quantity__lte=F('inventory__low_stock_threshold'),
+            inventory__quantity__gt=0
+        )
+
+        # Get out of stock products
+        out_of_stock = products.filter(inventory__quantity=0)
+
+        # Calculate category totals
+        from django.db.models import Sum
+        category_totals = Product.objects.values(
+            'category__name'
+        ).annotate(
+            total_items=Sum('inventory__quantity'),
+            total_value=Sum(F('inventory__quantity') * F('price'))
+        ).filter(is_active=True)
+
+        context.update({
+            'products': products,
+            'low_stock': low_stock,
+            'out_of_stock': out_of_stock,
+            'category_totals': category_totals,
+        })
+
+        return context

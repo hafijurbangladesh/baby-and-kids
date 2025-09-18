@@ -11,6 +11,7 @@ urlpatterns = [
     path('product/<int:pk>/delete/', views.ProductDeleteView.as_view(), name='product-delete'),
     path('product/<int:pk>/update-stock/', views.update_stock, name='update-stock'),
     path('low-stock/', views.LowStockListView.as_view(), name='low-stock'),
+    path('report/', views.InventoryReportView.as_view(), name='report'),  # Added inventory report URL
     path('api/product-search/', views.product_search, name='product-search'),
     path('api/recent-products/', views.recent_products, name='recent-products'),
     path('api/subcategories/', views.get_subcategories, name='get-subcategories'),

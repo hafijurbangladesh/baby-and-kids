@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load inventory_tags %}
+
+{% block title %}Inventory Report - Kids Store{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Inventory Report</h2>
+        <div>
+            <button onclick="window.print()" class="btn btn-secondary">
+                <i class="bi bi-printer"></i> Print Report
+            </button>
+            <a href="{% url 'dashboard:inventory-report-export' %}" class="btn btn-success">
+                <i class="bi bi-file-excel"></i> Export CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Total Products</h6>
+                    <h3 class="card-title mb-0">{{ products.count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Low Stock Items</h6>
+                    <h3 class="card-title mb-0 text-warning">{{ low_stock.count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Out of Stock</h6>
+                    <h3 class="card-title mb-0 text-danger">{{ out_of_stock.count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Total Stock Value</h6>
+                    <h3 class="card-title mb-0">৳{{ products|sum_attr:"price" }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Analysis -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Category Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Total Items</th>
+                                    <th>Total Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cat in category_totals %}
+                                <tr>
+                                    <td>{{ cat.category__name }}</td>
+                                    <td>{{ cat.total_items }}</td>
+                                    <td>৳{{ cat.total_value|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Inventory -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Detailed Inventory</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Brand</th>
+                            <th>Current Stock</th>
+                            <th>Low Stock Threshold</th>
+                            <th>Price</th>
+                            <th>Total Value</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td>{{ product.sku }}</td>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.category.name }}</td>
+                            <td>{{ product.brand.name }}</td>
+                            <td>{{ product.inventory.quantity }}</td>
+                            <td>{{ product.inventory.low_stock_threshold }}</td>
+                            <td>৳{{ product.price }}</td>
+                            <td>৳{{ product.price|multiply:product.inventory.quantity }}</td>
+                            <td>
+                                {% if product.inventory.quantity == 0 %}
+                                    <span class="badge bg-danger">Out of Stock</span>
+                                {% elif product.inventory.quantity <= product.inventory.low_stock_threshold %}
+                                    <span class="badge bg-warning">Low Stock</span>
+                                {% else %}
+                                    <span class="badge bg-success">In Stock</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        .btn { display: none; }
+        .card { border: none; }
+        .card-header { background: none; }
+    }
+</style>
+{% endblock %}

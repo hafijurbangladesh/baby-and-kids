@@ -41,24 +41,18 @@
                                 {{ form.price|add_class:"form-control" }}
                             </div>
                             
-                            <!-- Dynamic Category Selection -->
-                            <div id="category-container">
-                                <div class="mb-3">
-                                    <label class="form-label">Category *</label>
-                                    {{ form.category.errors }}
-                                    <select name="category" id="main-category" class="form-select" required>
-                                        <option value="">Select Category</option>
-                                        {% for category in root_categories %}
-                                            <option value="{{ category.id }}" {% if form.instance.category.get_root.id == category.id %}selected{% endif %}>
-                                                {{ category.name }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <!-- Subcategory dropdowns will be dynamically added here -->
-                                <div id="subcategory-container"></div>
-                                <!-- Hidden input to store the final selected category -->
-                                <input type="hidden" name="final_category" id="final-category" value="{{ form.instance.category.id|default:'' }}">
+                            <!-- Category Selection -->
+                            <div class="mb-3">
+                                <label class="form-label">Category *</label>
+                                {{ form.category.errors }}
+                                <select name="category" class="form-select" required>
+                                    <option value="">Select Category</option>
+                                    {% for category in categories %}
+                                        <option value="{{ category.id }}" {% if form.instance.category.id == category.id %}selected{% endif %}>
+                                            {{ category.hierarchy }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
                         
@@ -77,6 +71,16 @@
                                 <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
                                 {{ form.description.errors }}
                                 {{ form.description|add_class:"form-control" }}
+                            </div>
+                            <div class="mb-3">
+                                <label for="{{ form.color.id_for_label }}" class="form-label">{{ form.color.label }}</label>
+                                {{ form.color.errors }}
+                                {{ form.color|add_class:"form-select" }}
+                            </div>
+                            <div class="mb-3">
+                                <label for="{{ form.size.id_for_label }}" class="form-label">{{ form.size.label }}</label>
+                                {{ form.size.errors }}
+                                {{ form.size|add_class:"form-select" }}
                             </div>
                             <div class="mb-3">
                                 <label for="{{ form.image.id_for_label }}" class="form-label">{{ form.image.label }}</label>
@@ -107,6 +111,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/image-preview.js' %}"></script>
-<script src="{% static 'js/category-select.js' %}"></script>
+    <script src="{% static 'js/image-preview.js' %}"></script>
 {% endblock %}

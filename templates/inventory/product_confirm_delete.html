@@ -11,9 +11,10 @@
                     <h5 class="mb-0">Delete Product</h5>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-danger">
+                    <div class="alert alert-warning">
                         <h6 class="alert-heading">Warning!</h6>
-                        <p class="mb-0">Are you sure you want to delete the product "{{ object.name }}"?</p>
+                        <p class="mb-0">Are you sure you want to deactivate the product "{{ object.name }}"?</p>
+                        <p class="small text-muted mt-2">Note: This product has order history. It will be hidden from the product list but will remain in the system for record keeping.</p>
                     </div>
 
                     <div class="mb-4">
@@ -45,8 +46,8 @@
                             <a href="{% url 'inventory:product-list' %}" class="btn btn-secondary">
                                 <i class="bi bi-x-circle"></i> Cancel
                             </a>
-                            <button type="submit" class="btn btn-danger">
-                                <i class="bi bi-trash"></i> Delete Product
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-archive"></i> Deactivate Product
                             </button>
                         </div>
                     </form>

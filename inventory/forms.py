@@ -5,7 +5,7 @@ class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
         fields = ['name', 'description', 'price', 'category', 'brand', 
-                 'supplier', 'image', 'sku']
+                 'supplier', 'image', 'sku', 'color', 'size']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
             'price': forms.NumberInput(attrs={'min': '0', 'step': '0.01'})

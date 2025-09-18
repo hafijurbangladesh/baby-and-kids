@@ -1,104 +1,244 @@
-from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum, Count, F, Q, Avg
-from django.db.models.functions import TruncDate, ExtractHour, Coalesce
-from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import models
+from django.db.models import Sum, Count, Avg, F, Q, Max
+from django.db.models.functions import TruncDate, TruncHour, Coalesce
 from django.http import HttpResponse
-import json
-import csv
-from sales.models import Order, OrderItem
-from inventory.models import Product, Inventory
+from django.utils import timezone
+from django.views.generic import TemplateView
 from accounts.models import Customer
+from inventory.models import Product, Inventory
+from sales.models import Order, OrderItem
+import csv
+import json
+
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'dashboard/index.html'
 
-    def get_charts_data(self):
-        today = timezone.now()
-        thirty_days_ago = today - timedelta(days=30)
-
-        # Daily sales trend
-        daily_sales = Order.objects.filter(
-            status='completed',
-            order_date__date__gte=thirty_days_ago.date()
-        ).annotate(
-            date=TruncDate('order_date')
-        ).values('date').annotate(
-            total_sales=Coalesce(Sum('total'), 0)
-        ).order_by('date')
-
-        # Category distribution
-        category_sales = OrderItem.objects.filter(
-            order__status='completed',
-            order__order_date__gte=thirty_days_ago
-        ).values(
-            'product__category__name'
-        ).annotate(
-            total_sales=Sum(F('quantity') * F('price'))
-        ).order_by('-total_sales')[:5]
-
-        return {
-            'daily_sales': list(daily_sales),
-            'category_sales': list(category_sales)
-        }
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.now()
+        start_of_day = today.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_of_week = today - timedelta(days=today.weekday())
+        start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         thirty_days_ago = today - timedelta(days=30)
-        seven_days_ago = today - timedelta(days=7)
 
-        print("Debug: Fetching dashboard data...")
-        print(f"Date range: {thirty_days_ago} to {today}")
-
-        # Basic Sales Summary with default values
-        sales_summary = Order.objects.filter(
+        # Get all required metrics
+        sales_metrics = self.get_sales_metrics(start_of_day, start_of_week, start_of_month)
+        inventory_insights = self.get_inventory_insights()
+        customer_metrics = self.get_customer_metrics(start_of_month)
+        charts_data = self.get_charts_data(thirty_days_ago)
+        
+        # Get recent orders
+        recent_orders = Order.objects.filter(
             status='completed'
+        ).select_related('customer').order_by('-order_date')[:5]
+
+        # Calculate inventory value
+        inventory_value = Product.objects.aggregate(
+            total_value=Sum(F('inventory__quantity') * F('price'))
+        )['total_value'] or Decimal('0.00')
+
+        context.update({
+            'sales_summary': {
+                'today_sales': sales_metrics['today']['total_sales'],
+                'week_sales': sales_metrics['week']['total_sales'],
+                'total_orders': sales_metrics['month']['order_count'],
+            },
+            'inventory_summary': {
+                'total_value': inventory_value,
+                'low_stock_count': len(inventory_insights['low_stock_products']),
+                'out_of_stock_count': inventory_insights['out_of_stock_count'],
+            },
+            'recent_orders': recent_orders,
+            'low_stock_products': inventory_insights['low_stock_products'],
+            'top_products': self.get_top_selling_products(thirty_days_ago),
+            'recent_customers': Customer.objects.filter(
+                order__status='completed'
+            ).annotate(
+                total_orders=Count('order'),
+                total_spending=Sum('order__total'),
+                last_order_date=Max('order__order_date')
+            ).order_by('-last_order_date')[:5],
+            'charts_data': charts_data
+        })
+        
+        return context
+
+    def get_sales_metrics(self, start_of_day, start_of_week, start_of_month):
+        # Base queryset for completed orders
+        completed_orders = Order.objects.filter(status='completed')
+
+        # Today's metrics
+        today_metrics = completed_orders.filter(
+            order_date__gte=start_of_day
         ).aggregate(
-            today_sales=Coalesce(Sum('total', filter=Q(order_date__date=today.date())), Decimal('0.00')),
-            week_sales=Coalesce(Sum('total', filter=Q(order_date__gte=seven_days_ago)), Decimal('0.00')),
-            month_sales=Coalesce(Sum('total', filter=Q(order_date__gte=thirty_days_ago)), Decimal('0.00')),
-            total_orders=Count('id', filter=Q(order_date__gte=thirty_days_ago))
+            total_sales=Coalesce(Sum('total'), Decimal('0.00')),
+            order_count=Count('id'),
+            avg_order_value=Coalesce(Avg('total'), Decimal('0.00'))
         )
 
-        # Daily sales for the chart
+        # Week metrics
+        week_metrics = completed_orders.filter(
+            order_date__gte=start_of_week
+        ).aggregate(
+            total_sales=Coalesce(Sum('total'), Decimal('0.00')),
+            order_count=Count('id'),
+            avg_order_value=Coalesce(Avg('total'), Decimal('0.00'))
+        )
+
+        # Month metrics
+        month_metrics = completed_orders.filter(
+            order_date__gte=start_of_month
+        ).aggregate(
+            total_sales=Coalesce(Sum('total'), Decimal('0.00')),
+            order_count=Count('id'),
+            avg_order_value=Coalesce(Avg('total'), Decimal('0.00'))
+        )
+
+        return {
+            'today': today_metrics,
+            'week': week_metrics,
+            'month': month_metrics
+        }
+
+    def get_inventory_insights(self):
+        # Get low stock products (where quantity is below threshold)
+        low_stock_products = Product.objects.filter(
+            inventory__quantity__lte=F('inventory__low_stock_threshold')
+        ).select_related('inventory')[:5]
+
+        # Get top selling products
+        top_selling = OrderItem.objects.values(
+            'product__name'
+        ).annotate(
+            total_quantity=Sum('quantity'),
+            total_revenue=Sum(F('quantity') * F('price'))
+        ).order_by('-total_quantity')[:5]
+
+        # Get out of stock count
+        out_of_stock_count = Product.objects.filter(
+            inventory__quantity=0
+        ).count()
+
+        return {
+            'low_stock_products': low_stock_products,
+            'top_selling': top_selling,
+            'out_of_stock_count': out_of_stock_count
+        }
+
+    def get_customer_metrics(self, start_of_month):
+        # New customers this month
+        new_customers = Customer.objects.filter(
+            created_at__gte=start_of_month
+        ).count()
+
+        # Top customers by revenue
+        top_customers = Order.objects.filter(
+            status='completed'
+        ).values(
+            'customer__name'
+        ).annotate(
+            total_spent=Sum('total'),
+            order_count=Count('id')
+        ).order_by('-total_spent')[:5]
+
+        # Calculate retention rate
+        total_customers = Customer.objects.count()
+        if total_customers > 0:
+            repeat_customers = Order.objects.filter(
+                status='completed'
+            ).values('customer').annotate(
+                order_count=Count('id')
+            ).filter(order_count__gt=1).count()
+            
+            retention_rate = (repeat_customers / total_customers) * 100
+        else:
+            retention_rate = 0
+
+        return {
+            'new_customers': new_customers,
+            'top_customers': top_customers,
+            'retention_rate': retention_rate
+        }
+
+    def get_top_selling_products(self, thirty_days_ago):
+        """Get top selling products for the last 30 days"""
+        return OrderItem.objects.filter(
+            order__status='completed',
+            order__order_date__gte=thirty_days_ago
+        ).values(
+            'product__name',
+            'product__sku',
+            'product__category__name'
+        ).annotate(
+            total_quantity=Sum('quantity'),
+            total_sales=Sum(F('quantity') * F('price'))
+        ).order_by('-total_quantity')[:5]
+
+    def get_charts_data(self, thirty_days_ago):
+        # Daily sales trend for the last 30 days
         daily_sales = Order.objects.filter(
             status='completed',
             order_date__gte=thirty_days_ago
         ).annotate(
             date=TruncDate('order_date')
         ).values('date').annotate(
-            total_sales=Coalesce(Sum('total'), Decimal('0.00'))
+            total_sales=Coalesce(Sum('total'), Decimal('0.00')),
+            order_count=Count('id')
         ).order_by('date')
 
-        # Low stock products
-        low_stock_products = Product.objects.select_related('inventory').filter(
-            inventory__quantity__lte=F('inventory__low_stock_threshold')
-        )[:5]
+        # If there are missing dates in the range, fill them with zeros
+        all_dates = []
+        current_date = thirty_days_ago.date()
+        end_date = timezone.now().date()
+        
+        # Create a dictionary of existing sales data
+        sales_dict = {item['date']: item for item in daily_sales}
+        
+        # Fill in all dates
+        while current_date <= end_date:
+            if current_date in sales_dict:
+                all_dates.append(sales_dict[current_date])
+            else:
+                all_dates.append({
+                    'date': current_date,
+                    'total_sales': Decimal('0.00'),
+                    'order_count': 0
+                })
+            current_date += timedelta(days=1)
 
-        # Top selling products
-        top_products = OrderItem.objects.filter(
+        # Category performance
+        category_sales = OrderItem.objects.filter(
             order__status='completed',
             order__order_date__gte=thirty_days_ago
         ).values(
-            'product__name'
+            'product__category__name'
         ).annotate(
-            total_quantity=Sum('quantity')
-        ).order_by('-total_quantity')[:5]
+            total_sales=Coalesce(Sum(F('quantity') * F('price')), Decimal('0.00')),
+            quantity_sold=Sum('quantity')
+        ).order_by('-total_sales')
 
-        # Prepare context with basic metrics
-        context.update({
-            'sales_summary': sales_summary,
-            'low_stock_products': low_stock_products,
-            'top_products': top_products,
-            'charts_data': json.dumps({
-                'dates': [str(entry['date']) for entry in daily_sales],
-                'sales': [float(entry['total_sales']) for entry in daily_sales]
-            })
-        })
-        return context
+        # Convert Decimal objects to float for JSON serialization
+        daily_sales_data = [{
+            'date': item['date'].isoformat(),
+            'total_sales': float(item['total_sales']),
+            'order_count': item['order_count']
+        } for item in all_dates]
+
+        category_sales_data = [{
+            'product__category__name': item['product__category__name'] or 'Uncategorized',
+            'total_sales': float(item['total_sales']),
+            'quantity_sold': item['quantity_sold']
+        } for item in category_sales]
+
+        return {
+            'daily_sales': daily_sales_data,
+            'category_sales': category_sales_data
+        }
+
 
 class SalesReportView(LoginRequiredMixin, TemplateView):
     template_name = 'reports/sales_report.html'
@@ -128,22 +268,25 @@ class SalesReportView(LoginRequiredMixin, TemplateView):
             status='completed'
         ).select_related('customer', 'transaction')
 
-        # Generate summary metrics
+        # Generate all report data
         summary = self.get_sales_summary(orders)
-        
-        # Generate trend data
-        sales_trend = self.get_sales_trend(orders, report_type)
-        
-        # Get category sales
-        category_sales = self.get_category_sales(orders)
-        
-        # Get top products
+        sales_trend_data = self.get_sales_trend(orders, report_type)
+        category_sales_data = self.get_category_sales(orders)
         top_products = self.get_top_products(orders)
+
+        # Prepare category sales data for the chart
+        category_data = {
+            'categories': json.dumps([item['product__category__name'] or 'Uncategorized' for item in category_sales_data]),
+            'amounts': json.dumps([float(item['total_sales']) for item in category_sales_data])
+        }
 
         context.update({
             'summary': summary,
-            'sales_trend': sales_trend,
-            'category_sales': category_sales,
+            'sales_trend': {
+                'dates': json.dumps(sales_trend_data['labels']),
+                'sales': json.dumps(sales_trend_data['data'])
+            },
+            'category_sales': category_data,
             'top_products': top_products,
             'orders': orders[:50],  # Limit to last 50 orders
             'report_type': report_type,
@@ -154,210 +297,106 @@ class SalesReportView(LoginRequiredMixin, TemplateView):
         return context
 
     def get_sales_summary(self, orders):
+        """Generate summary metrics for sales report"""
         items_sold = OrderItem.objects.filter(
             order__in=orders
-        ).aggregate(total=Sum('quantity'))['total'] or 0
+        ).aggregate(total=Coalesce(Sum('quantity'), 0))['total']
 
         summary = orders.aggregate(
-            total_sales=Sum('total') or 0,
+            total_sales=Coalesce(Sum('total'), Decimal('0.00')),
             total_orders=Count('id'),
-            avg_order_value=Avg('total') or 0
+            avg_order_value=Coalesce(Avg('total'), Decimal('0.00'))
         )
         summary['items_sold'] = items_sold
-
         return summary
 
     def get_sales_trend(self, orders, report_type):
-        sales_by_date = orders.annotate(
-            date=TruncDate('order_date')
-        ).values('date').annotate(
-            total=Sum('total')
-        ).order_by('date')
+        """Generate sales trend data based on report type"""
+        # Get start and end dates from orders or request
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
 
-        dates = [item['date'].strftime('%Y-%m-%d') for item in sales_by_date]
-        sales = [float(item['total']) for item in sales_by_date]
+        if start_date:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        else:
+            start_date = timezone.now() - timedelta(days=30)
+
+        if end_date:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+        else:
+            end_date = timezone.now()
+
+        # Set up time truncation based on report type
+        if report_type == 'hourly':
+            trunc_func = TruncHour('order_date')
+            format_str = '%Y-%m-%d %H:00'
+            delta = timedelta(hours=1)
+            current = timezone.localtime(start_date).replace(minute=0, second=0, microsecond=0)
+            end = timezone.localtime(end_date)
+        else:  # daily
+            trunc_func = TruncDate('order_date')
+            format_str = '%Y-%m-%d'
+            delta = timedelta(days=1)
+            current = start_date.date()
+            end = end_date.date()
+
+        # Get sales data
+        sales_data = orders.annotate(
+            period=trunc_func
+        ).values('period').annotate(
+            total=Coalesce(Sum('total'), Decimal('0.00')),
+            count=Count('id')
+        ).order_by('period')
+
+        # Create a dictionary of existing data
+        data_dict = {x['period']: x for x in sales_data}
+        
+        # Fill in all periods with data or zeros
+        all_periods = []
+        while current <= end:
+            if current in data_dict:
+                all_periods.append({
+                    'period': current,
+                    'total': float(data_dict[current]['total']),
+                    'count': data_dict[current]['count']
+                })
+            else:
+                all_periods.append({
+                    'period': current,
+                    'total': 0.0,
+                    'count': 0
+                })
+            current += delta
 
         return {
-            'dates': dates,
-            'sales': sales
+            'labels': [p['period'].strftime(format_str) for p in all_periods],
+            'data': [p['total'] for p in all_periods],
+            'counts': [p['count'] for p in all_periods]
         }
 
     def get_category_sales(self, orders):
+        """Generate category-wise sales data"""
         return OrderItem.objects.filter(
             order__in=orders
         ).values(
             'product__category__name'
         ).annotate(
-            total=Sum(F('quantity') * F('price')),
-            items_sold=Sum('quantity')
-        ).order_by('-total')
-
-    def get_top_products(self, orders):
-        return OrderItem.objects.filter(
-            order__in=orders
-        ).values(
-            'product__name',
-            'product__sku'
-        ).annotate(
-            total=Sum(F('quantity') * F('price')),
-            items_sold=Sum('quantity')
-        ).order_by('-total')[:10]
-
-class DashboardView(LoginRequiredMixin, TemplateView):
-    template_name = 'dashboard/dashboard.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        today = timezone.now()
-        thirty_days_ago = today - timedelta(days=30)
-        seven_days_ago = today - timedelta(days=7)
-
-        print("Debug: Fetching dashboard data...")
-        print(f"Date range: {thirty_days_ago} to {today}")
-
-        # Basic Sales Summary
-        sales_summary = Order.objects.filter(
-            status='completed'
-        ).aggregate(
-            today_sales=Coalesce(Sum('total', filter=Q(order_date__date=today.date())), Decimal('0.00')),
-            week_sales=Coalesce(Sum('total', filter=Q(order_date__gte=seven_days_ago)), Decimal('0.00')),
-            month_sales=Coalesce(Sum('total', filter=Q(order_date__gte=thirty_days_ago)), Decimal('0.00')),
-            total_orders=Count('id', filter=Q(order_date__gte=thirty_days_ago))
-        )
-
-        # Charts Data
-        context.update({
-            'sales_summary': sales_summary,
-            'charts_data': self.get_charts_data()
-        })
-        
-        return context
-
-    def get_sales_metrics(self, start_of_day, start_of_week, start_of_month):
-        # Today's metrics
-        today_orders = Order.objects.filter(
-            order_date__gte=start_of_day,
-            status='completed'
-        )
-        today_sales = today_orders.aggregate(
-            total_sales=Sum('total') or Decimal('0.00'),
-            order_count=Count('id'),
-            avg_order_value=Avg('total')
-        )
-
-        # This week's metrics
-        week_orders = Order.objects.filter(
-            order_date__gte=start_of_week,
-            status='completed'
-        )
-        week_sales = week_orders.aggregate(
-            total_sales=Sum('total') or Decimal('0.00'),
-            order_count=Count('id')
-        )
-
-        # This month's metrics
-        month_orders = Order.objects.filter(
-            order_date__gte=start_of_month,
-            status='completed'
-        )
-        month_sales = month_orders.aggregate(
-            total_sales=Sum('total') or Decimal('0.00'),
-            order_count=Count('id')
-        )
-
-        return {
-            'today_sales': today_sales,
-            'week_sales': week_sales,
-            'month_sales': month_sales
-        }
-
-    def get_inventory_insights(self):
-        # Low stock products
-        low_stock_products = Product.objects.filter(
-            inventory__quantity__lte=F('inventory__low_stock_threshold')
-        ).select_related('inventory')[:5]
-
-        # Top selling products
-        top_selling = OrderItem.objects.values(
-            'product__name'
-        ).annotate(
-            total_quantity=Sum('quantity'),
-            total_revenue=Sum(F('quantity') * F('price'))
-        ).order_by('-total_quantity')[:5]
-
-        # Out of stock products
-        out_of_stock = Product.objects.filter(
-            inventory__quantity=0
-        ).count()
-
-        return {
-            'low_stock_products': low_stock_products,
-            'top_selling_products': top_selling,
-            'out_of_stock_count': out_of_stock
-        }
-
-    def get_customer_metrics(self, start_of_month):
-        # New customers this month
-        new_customers = Customer.objects.filter(
-            created_at__gte=start_of_month
-        ).count()
-
-        # Top customers by revenue
-        top_customers = Order.objects.filter(
-            status='completed'
-        ).values(
-            'customer__name'
-        ).annotate(
-            total_spent=Sum('total'),
-            order_count=Count('id')
-        ).order_by('-total_spent')[:5]
-
-        # Customer retention rate
-        total_customers = Customer.objects.count()
-        repeat_customers = Order.objects.filter(
-            status='completed'
-        ).values('customer').annotate(
-            order_count=Count('id')
-        ).filter(order_count__gt=1).count()
-
-        retention_rate = (repeat_customers / total_customers * 100) if total_customers > 0 else 0
-
-        return {
-            'new_customers': new_customers,
-            'top_customers': top_customers,
-            'retention_rate': retention_rate
-        }
-
-    def get_charts_data(self):
-        today = timezone.now()
-        thirty_days_ago = today - timedelta(days=30)
-
-        # Daily sales trend
-        daily_sales = Order.objects.filter(
-            status='completed',
-            order_date__gte=thirty_days_ago
-        ).annotate(
-            date=TruncDate('order_date')
-        ).values('date').annotate(
-            total_sales=Sum('total'),
-            order_count=Count('id')
-        ).order_by('date')
-
-        # Category performance
-        category_sales = OrderItem.objects.filter(
-            order__status='completed',
-            order__order_date__gte=thirty_days_ago
-        ).values(
-            'product__category__name'
-        ).annotate(
-            total_sales=Sum(F('quantity') * F('price')),
+            total_sales=Coalesce(Sum(F('quantity') * F('price')), Decimal('0.00')),
             quantity_sold=Sum('quantity')
         ).order_by('-total_sales')
 
-        return {
-            'daily_sales': list(daily_sales),
-            'category_sales': list(category_sales)
-        }
+    def get_top_products(self, orders):
+        """Get top selling products for the period"""
+        return OrderItem.objects.filter(
+            order__in=orders
+        ).values(
+            'product__name', 
+            'product__sku'
+        ).annotate(
+            total_quantity=Sum('quantity'),
+            total_sales=Coalesce(Sum(F('quantity') * F('price')), Decimal('0.00'))
+        ).order_by('-total_quantity')[:10]
+
 
 class InventoryReportView(LoginRequiredMixin, TemplateView):
     template_name = 'reports/inventory_report.html'
@@ -394,6 +433,7 @@ class InventoryReportView(LoginRequiredMixin, TemplateView):
         })
 
         return context
+
 
 def export_sales_report(request):
     # Get date range from request
@@ -436,11 +476,12 @@ def export_sales_report(request):
             order.customer.name if order.customer else 'Walk-in Customer',
             order.orderitem_set.count(),
             order.total,
-            order.transaction.payment_method,
+            order.transaction.payment_method if hasattr(order, 'transaction') else 'N/A',
             order.status
         ])
 
     return response
+
 
 def export_inventory_report(request):
     # Get all products with their inventory

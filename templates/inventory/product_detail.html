@@ -46,6 +46,14 @@
                     <div class="col-md-4 text-muted">Supplier</div>
                     <div class="col-md-8">{{ product.supplier.name }}</div>
                 </div>
+                <div class="row mb-3">
+                    <div class="col-md-4 text-muted">Color</div>
+                    <div class="col-md-8">{{ product.color.name|default:'-' }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4 text-muted">Size</div>
+                    <div class="col-md-8">{{ product.size.name|default:'-' }}</div>
+                </div>
             </div>
         </div>
 

@@ -3,10 +3,14 @@ from django.db import migrations
 def create_categories(apps, schema_editor):
     Category = apps.get_model('inventory', 'Category')
     
-    # Clear existing categories
-    Category.objects.all().delete()
+    def create_category_tree(name, parent=None):
+        category, created = Category.objects.get_or_create(
+            name=name,
+            defaults={'parent': parent}
+        )
+        return category
     
-    # Create main categories
+    # Get or create categories
     categories = {
         'Newborn Essentials': {
             'Bodysuits & Onesies': {
@@ -101,17 +105,13 @@ def create_categories(apps, schema_editor):
         },
     }
 
-    def create_category_tree(data, parent=None):
+    def process_categories(data, parent=None):
         for name, children in data.items():
-            category = Category.objects.create(
-                name=name,
-                parent=parent,
-                description=f"Category for {name}"
-            )
+            category = create_category_tree(name, parent)
             if children:
-                create_category_tree(children, category)
+                process_categories(children, category)
 
-    create_category_tree(categories)
+    process_categories(categories)
 
 def reverse_categories(apps, schema_editor):
     Category = apps.get_model('inventory', 'Category')

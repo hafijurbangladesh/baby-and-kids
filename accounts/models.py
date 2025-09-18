@@ -79,10 +79,37 @@ class Customer(models.Model):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    phone_number = models.CharField(max_length=14, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
     is_salesperson = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.user.username} Profile"
+
+    def clean_phone_number(self):
+        """Clean and format the phone number"""
+        if not self.phone_number:
+            return None
+
+        # Remove any spaces and dashes
+        phone = self.phone_number.strip().replace(' ', '').replace('-', '')
+        
+        # If already has +88 prefix, return as is
+        if phone.startswith('+88') and len(phone) == 14:
+            return phone
+            
+        # If it's an 11-digit number starting with 0
+        if len(phone) == 11 and phone.startswith('0'):
+            return f'+88{phone}'
+            
+        return phone
+
+    def save(self, *args, **kwargs):
+        """Override save to ensure phone number is properly formatted"""
+        if self.phone_number:
+            self.phone_number = self.clean_phone_number()
+        super().save(*args, **kwargs)
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
