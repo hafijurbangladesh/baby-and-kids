@@ -52,7 +52,7 @@
                             </a>
                         </td>
                         <td>{{ order.orderitem_set.count }} items</td>
-                        <td>${{ order.total|floatformat:2 }}</td>
+                        <td><span class="currency-symbol">৳</span>{{ order.total|floatformat:2 }}</td>
                         <td>
                             <span class="badge {% if order.status == 'completed' %}bg-success
                                           {% elif order.status == 'pending' %}bg-warning

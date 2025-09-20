@@ -202,7 +202,7 @@ function updateCartDisplay() {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="mb-0">${item.name}</h6>
-                        <small class="text-muted">$${item.price.toFixed(2)} × ${item.quantity}</small>
+                        <small class="text-muted">৳${item.price.toFixed(2)} × ${item.quantity}</small>
                     </div>
                     <div class="d-flex align-items-center">
                         <div class="btn-group me-2">
@@ -213,7 +213,7 @@ function updateCartDisplay() {
                                 <i class="bi bi-plus"></i>
                             </button>
                         </div>
-                        <span class="me-3">$${itemTotal}</span>
+                        <span class="me-3">৳${itemTotal}</span>
                         <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart(${item.id})">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -228,9 +228,9 @@ function updateCartDisplay() {
     const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
     const total = parseFloat((subtotal + tax).toFixed(2));
 
-    $('#subtotal').text(`$${subtotal.toFixed(2)}`);
-    $('#tax').text(`$${tax.toFixed(2)}`);
-    $('#total').text(`$${total.toFixed(2)}`);
+    $('#subtotal').text(`৳${subtotal.toFixed(2)}`);
+    $('#tax').text(`৳${tax.toFixed(2)}`);
+    $('#total').text(`৳${total.toFixed(2)}`);
     
     // Enable/disable complete sale button
     $('#complete-sale').prop('disabled', cart.length === 0);
@@ -245,9 +245,9 @@ function showPaymentModal() {
     const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
     const total = parseFloat((subtotal + tax).toFixed(2));
     
-    $('#payment-total').text(`$${total.toFixed(2)}`);
+    $('#payment-total').text(`৳${total.toFixed(2)}`);
     $('#amount-received').val('').removeClass('is-invalid');
-    $('#change-amount').text('$0.00');
+    $('#change-amount').text('৳0.00');
     $('#confirm-payment').prop('disabled', true);    const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
     modal.show();
 
@@ -256,7 +256,7 @@ function showPaymentModal() {
         const amountReceived = parseFloat(this.value) || 0;
         const change = amountReceived - total;
         
-        $('#change-amount').text(`$${Math.max(0, change).toFixed(2)}`);
+        $('#change-amount').text(`৳${Math.max(0, change).toFixed(2)}`);
         $('#confirm-payment').prop('disabled', amountReceived < total);
         
         const isValid = amountReceived >= total;

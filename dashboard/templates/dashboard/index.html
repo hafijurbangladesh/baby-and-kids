@@ -12,7 +12,10 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Today's Sales</h5>
-                    <h3 class="text-success">{{ sales_summary.today_sales|bdt }}</h3>
+                    <h3 class="text-success">
+                        <span class="currency-symbol">৳</span>
+                        {{ sales_summary.today_sales|floatformat:2 }}
+                    </h3>
                 </div>
             </div>
         </div>
@@ -20,7 +23,10 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Weekly Sales</h5>
-                    <h3 class="text-info">{{ sales_summary.week_sales|bdt }}</h3>
+                    <h3 class="text-info">
+                        <span class="currency-symbol">৳</span>
+                        {{ sales_summary.week_sales|floatformat:2 }}
+                    </h3>
                 </div>
             </div>
         </div>
@@ -28,7 +34,10 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Monthly Sales</h5>
-                    <h3 class="text-primary">{{ sales_summary.month_sales|bdt }}</h3>
+                    <h3 class="text-primary">
+                        <span class="currency-symbol">৳</span>
+                        {{ sales_summary.month_sales|floatformat:2 }}
+                    </h3>
                 </div>
             </div>
         </div>
@@ -72,7 +81,7 @@
                                 {% for product in top_products %}
                                 <tr>
                                     <td>{{ product.product__name }}</td>
-                                    <td>{{ product.total_quantity }}</td>
+                                    <td>{{ product.total_quantity }} <small class="text-muted">(৳{{ product.total_sales|floatformat:2 }})</small></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -131,7 +140,21 @@
             responsive: true,
             scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value, index, values) {
+                            return '৳' + value.toLocaleString();
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return '৳' + context.parsed.y.toLocaleString();
+                        }
+                    }
                 }
             }
         }

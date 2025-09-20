@@ -41,7 +41,7 @@
                                 {% endif %}
                             </td>
                             <td>{{ order.orderitem_set.count }} item(s)</td>
-                            <td>${{ order.total|floatformat:2 }}</td>
+                            <td><span class="currency-symbol">৳</span>{{ order.total|floatformat:2 }}</td>
                             <td>
                                 <span class="badge bg-{{ order.status }}">
                                     {{ order.get_status_display }}

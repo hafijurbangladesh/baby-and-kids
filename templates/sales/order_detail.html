@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Order #{{ order.id }} - Kids Store{% endblock %}
 
 {% block extra_css %}
 <style>
     @media print {
-        .no-print {
+        .no-print, footer, .main-footer {
             display: none !important;
         }
         .print-only {
@@ -14,9 +15,25 @@
         .card {
             border: none !important;
         }
+        body {
+            margin: 0;
+            padding: 0;
+        }
     }
     .print-only {
         display: none;
+    }
+    .receipt-logo {
+        max-width: 150px;
+        filter: grayscale(100%);
+        margin-bottom: 1rem;
+    }
+    .receipt-contact {
+        margin-bottom: 0.5rem;
+        font-size: 14px;
+    }
+    .receipt-contact i {
+        margin-right: 0.5rem;
     }
 </style>
 {% endblock %}
@@ -39,9 +56,13 @@
             
             <!-- Print Header -->
             <div class="print-only p-4 text-center">
-                <h2>Kids Store</h2>
-                <p>123 Main Street, City, Country</p>
-                <p>Phone: (123) 456-7890</p>
+                <img src="{% static 'img/b&k4.png' %}" alt="Baby & Kids" class="receipt-logo">
+                <p class="receipt-contact">Bokultola, Jamalpur</p>
+                <p class="receipt-contact">
+                    <i class="bi bi-phone"></i>01911937235
+                    <span class="mx-2">|</span>
+                    <i class="bi bi-facebook"></i>baby & kids
+                </p>
                 <hr>
                 <h4>Sales Receipt</h4>
             </div>
@@ -66,7 +87,7 @@
                                 {{ order.get_status_display }}
                             </span>
                         </p>
-                        <p class="mb-1">Salesperson: {{ order.salesperson.get_full_name }}</p>
+                        <p class="mb-1">Salesperson: {% if order.salesperson.get_full_name %}{{ order.salesperson.get_full_name }}{% else %}{{ order.salesperson.username }}{% endif %}</p>
                     </div>
                 </div>
 
@@ -88,23 +109,23 @@
                                     <small class="text-muted">SKU: {{ item.product.sku }}</small>
                                 </td>
                                 <td class="text-center">{{ item.quantity }}</td>
-                                <td class="text-end">${{ item.price|floatformat:2 }}</td>
-                                <td class="text-end">${{ item.get_total|floatformat:2 }}</td>
+                                <td class="text-end">৳{{ item.price|floatformat:2 }}</td>
+                                <td class="text-end">৳{{ item.total|floatformat:2 }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot>
                             <tr>
                                 <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
-                                <td class="text-end">${{ order.get_subtotal|floatformat:2 }}</td>
+                                <td class="text-end">৳{{ order.subtotal|floatformat:2 }}</td>
                             </tr>
                             <tr>
                                 <td colspan="3" class="text-end"><strong>Tax (10%):</strong></td>
-                                <td class="text-end">${{ order.get_tax|floatformat:2 }}</td>
+                                <td class="text-end">৳{{ order.tax|floatformat:2 }}</td>
                             </tr>
                             <tr>
                                 <td colspan="3" class="text-end"><strong>Total:</strong></td>
-                                <td class="text-end"><strong>${{ order.total|floatformat:2 }}</strong></td>
+                                <td class="text-end"><strong>৳{{ order.total|floatformat:2 }}</strong></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -114,18 +135,14 @@
                 <div class="mt-4">
                     <h6 class="text-muted">Payment Information</h6>
                     <p class="mb-1">Method: {{ order.transaction.get_payment_method_display }}</p>
-                    <p class="mb-1">Amount Paid: ${{ order.transaction.amount_paid|floatformat:2 }}</p>
+                    <p class="mb-1">Amount Paid: ৳{{ order.transaction.amount_paid|floatformat:2 }}</p>
                     <p class="mb-1">Transaction Date: {{ order.transaction.transaction_date|date:"M d, Y H:i" }}</p>
                 </div>
                 {% endif %}
 
                 <!-- Print Footer -->
                 <div class="print-only mt-4 text-center">
-                    <p>Thank you for shopping with us!</p>
-                    <p>For returns and exchanges, please bring this receipt within 30 days of purchase.</p>
-                    <p class="mt-4">
-                        <small>Receipt generated on {% now "F d, Y H:i" %}</small>
-                    </p>
+                    <p><small>© {% now "Y" %} ZAZ Innovation Ltd. All Rights Reserved.</small></p>
                 </div>
             </div>
         </div>

@@ -11,7 +11,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Today's Sales</h6>
-                    <h4 class="card-title mb-0">${{ sales_summary.today_sales|default:"0.00"|floatformat:2 }}</h4>
+                    <h4 class="card-title mb-0">৳{{ sales_summary.today_sales|default:"0.00"|floatformat:2 }}</h4>
                 </div>
             </div>
         </div>
@@ -19,7 +19,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Weekly Sales</h6>
-                    <h4 class="card-title mb-0">${{ sales_summary.week_sales|default:"0.00"|floatformat:2 }}</h4>
+                    <h4 class="card-title mb-0">৳{{ sales_summary.week_sales|default:"0.00"|floatformat:2 }}</h4>
                 </div>
             </div>
         </div>
@@ -35,7 +35,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Inventory Value</h6>
-                    <h4 class="card-title mb-0">${{ inventory_summary.total_value|default:"0.00"|floatformat:2 }}</h4>
+                    <h4 class="card-title mb-0">৳{{ inventory_summary.total_value|default:"0.00"|floatformat:2 }}</h4>
                 </div>
             </div>
         </div>
@@ -74,7 +74,7 @@
                                             <span class="text-muted">Walk-in Customer</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">${{ order.total|floatformat:2 }}</td>
+                                    <td class="text-end">৳{{ order.total|floatformat:2 }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
@@ -153,7 +153,7 @@
                                 <tr>
                                     <td>{{ product.product__name }}</td>
                                     <td class="text-end">{{ product.total_quantity }}</td>
-                                    <td class="text-end">${{ product.total_sales|floatformat:2 }}</td>
+                                    <td class="text-end">৳{{ product.total_sales|floatformat:2 }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
@@ -188,7 +188,7 @@
                                 <tr>
                                     <td>{{ customer.name }}</td>
                                     <td class="text-end">{{ customer.total_orders }}</td>
-                                    <td class="text-end">${{ customer.total_spending|default:"0.00"|floatformat:2 }}</td>
+                                    <td class="text-end">৳{{ customer.total_spending|default:"0.00"|floatformat:2 }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>

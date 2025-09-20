@@ -60,6 +60,11 @@ class OrderItem(models.Model):
             self.price = self.product.price
         super().save(*args, **kwargs)
 
+    @property
+    def total(self):
+        """Calculate and return the total for this order item"""
+        return self.price * self.quantity
+
 class Transaction(models.Model):
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),

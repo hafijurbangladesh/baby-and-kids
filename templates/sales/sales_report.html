@@ -43,7 +43,7 @@
                 <div class="card bg-primary text-white">
                     <div class="card-body">
                         <h6 class="card-title">Total Sales</h6>
-                        <h3 class="mb-0">${{ total_sales|floatformat:2 }}</h3>
+                        <h3 class="mb-0">৳{{ total_sales|floatformat:2 }}</h3>
                     </div>
                 </div>
             </div>
@@ -59,7 +59,7 @@
                 <div class="card bg-info text-white">
                     <div class="card-body">
                         <h6 class="card-title">Average Order Value</h6>
-                        <h3 class="mb-0">${{ average_order|floatformat:2 }}</h3>
+                        <h3 class="mb-0">৳{{ average_order|floatformat:2 }}</h3>
                     </div>
                 </div>
             </div>
@@ -117,7 +117,7 @@
                                 <td>{{ product.product__name }}</td>
                                 <td>{{ product.product__category__name }}</td>
                                 <td>{{ product.total_quantity }}</td>
-                                <td>${{ product.total_revenue|floatformat:2 }}</td>
+                                <td>৳{{ product.total_revenue|floatformat:2 }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return '$' + value;
+                            return '৳' + value;
                         }
                     }
                 }
