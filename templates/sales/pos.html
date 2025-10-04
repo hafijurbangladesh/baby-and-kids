@@ -23,6 +23,33 @@
         transform: translateY(-2px);
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
+    
+    /* Customer search dropdown styling */
+    #customer-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    #customer-dropdown .dropdown-item {
+        cursor: pointer;
+        padding: 0.75rem 1rem;
+    }
+    
+    #customer-dropdown .dropdown-item:hover {
+        background-color: #e9ecef;
+    }
+    
+    #customer-dropdown .dropdown-item:active {
+        background-color: #007bff;
+        color: white;
+    }
 </style>
 {% endblock %}
 
@@ -89,11 +116,27 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label for="customer-select" class="form-label">Customer</label>
-                    <select id="customer-select" class="form-select">
-                        <option value="">Walk-in Customer</option>
-                        {% for customer in customers %}
-                        <option value="{{ customer.id }}">{{ customer.name }}</option>
+                    <label for="customer-search" class="form-label">Customer</label>
+                    <div class="position-relative">
+                        <input type="text" id="customer-search" class="form-control" 
+                               placeholder="Search by name or mobile number..." 
+                               autocomplete="off">
+                        <input type="hidden" id="customer-id" value="">
+                        <div id="customer-dropdown" class="dropdown-menu w-100" style="display: none; max-height: 200px; overflow-y: auto;">
+                            <!-- Customer search results will appear here -->
+                        </div>
+                        <small class="form-text text-muted">
+                            Selected: <span id="selected-customer">Walk-in Customer</span>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="shop-assistant-select" class="form-label">Shop Assistant</label>
+                    <select id="shop-assistant-select" class="form-select">
+                        <option value="">No Assistant</option>
+                        {% for assistant in shop_assistants %}
+                        <option value="{{ assistant.id }}">{{ assistant.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -108,10 +151,6 @@
                     <div class="d-flex justify-content-between mb-2">
                         <span>Subtotal:</span>
                         <span id="subtotal">৳0.00</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-3">
-                        <span>Tax (10%):</span>
-                        <span id="tax">৳0.00</span>
                     </div>
                     <div class="d-flex justify-content-between mb-3">
                         <h5 class="mb-0">Total:</h5>

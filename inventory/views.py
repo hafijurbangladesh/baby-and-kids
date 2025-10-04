@@ -209,60 +209,79 @@ class LowStockListView(LoginRequiredMixin, ListView):
 @login_required
 def update_stock(request, pk):
     product = get_object_or_404(Product, pk=pk)
+    
     if request.method == 'POST':
         try:
             adjustment = int(request.POST.get('adjustment', 0))
             reason = request.POST.get('reason', '').strip()
             
+            # Validation
             if not reason:
-                return JsonResponse({
-                    'error': 'Please provide a reason for the adjustment'
-                }, status=400)
+                from django.contrib import messages
+                messages.error(request, 'Please provide a reason for the adjustment.')
+                return HttpResponseRedirect(reverse('inventory:product-detail', kwargs={'pk': pk}))
             
             if adjustment == 0:
-                return JsonResponse({
-                    'error': 'Adjustment quantity cannot be zero'
-                }, status=400)
+                from django.contrib import messages
+                messages.error(request, 'Adjustment quantity cannot be zero.')
+                return HttpResponseRedirect(reverse('inventory:product-detail', kwargs={'pk': pk}))
             
-            if product.inventory:
-                with transaction.atomic():
-                    # Determine adjustment type
-                    if adjustment > 0:
-                        adjustment_type = 'addition'
-                    elif adjustment < 0:
-                        adjustment_type = 'reduction'
-                    else:
-                        adjustment_type = 'correction'
-                    
-                    # Create stock adjustment record
-                    StockAdjustment.objects.create(
-                        product=product,
-                        quantity=adjustment,
-                        adjustment_type=adjustment_type,
-                        reason=reason,
-                        adjusted_by=request.user
-                    )
-                    
-                    # Update inventory
-                    product.inventory.quantity = F('quantity') + adjustment
-                    product.inventory.save()
-                    product.inventory.refresh_from_db()
-                    
-                    # Redirect to product list page
-                    return HttpResponseRedirect(reverse('inventory:product-list'))
-                    
-            return JsonResponse({
-                'error': 'Product has no inventory record'
-            }, status=400)
+            # Get or create inventory if it doesn't exist
+            inventory, created = Inventory.objects.get_or_create(
+                product=product,
+                defaults={
+                    'quantity': 0,
+                    'low_stock_threshold': 5
+                }
+            )
             
+            # Check if adjustment would result in negative stock
+            new_quantity = inventory.quantity + adjustment
+            if new_quantity < 0:
+                from django.contrib import messages
+                messages.error(request, f'Adjustment would result in negative stock. Current stock: {inventory.quantity}')
+                return HttpResponseRedirect(reverse('inventory:product-detail', kwargs={'pk': pk}))
+            
+            with transaction.atomic():
+                # Determine adjustment type
+                if adjustment > 0:
+                    adjustment_type = 'addition'
+                elif adjustment < 0:
+                    adjustment_type = 'reduction'
+                else:
+                    adjustment_type = 'correction'
+                
+                # Create stock adjustment record
+                StockAdjustment.objects.create(
+                    product=product,
+                    quantity=adjustment,
+                    adjustment_type=adjustment_type,
+                    reason=reason,
+                    adjusted_by=request.user
+                )
+                
+                # Update inventory quantity
+                inventory.quantity = new_quantity
+                inventory.save()
+                
+                from django.contrib import messages
+                action = "increased" if adjustment > 0 else "decreased"
+                messages.success(request, f'Stock successfully {action} by {abs(adjustment)} units. New stock: {inventory.quantity}')
+                
+            # Redirect back to product detail page
+            return HttpResponseRedirect(reverse('inventory:product-detail', kwargs={'pk': pk}))
+                
         except ValueError:
-            return JsonResponse({
-                'error': 'Invalid adjustment value'
-            }, status=400)
-            
-    return JsonResponse({
-        'error': 'Invalid request method'
-    }, status=405)
+            from django.contrib import messages
+            messages.error(request, 'Invalid adjustment value. Please enter a valid number.')
+            return HttpResponseRedirect(reverse('inventory:product-detail', kwargs={'pk': pk}))
+        except Exception as e:
+            from django.contrib import messages
+            messages.error(request, f'An error occurred while updating stock: {str(e)}')
+            return HttpResponseRedirect(reverse('inventory:product-detail', kwargs={'pk': pk}))
+    
+    # If not POST request, redirect to product detail
+    return HttpResponseRedirect(reverse('inventory:product-detail', kwargs={'pk': pk}))
 
 
 class InventoryReportView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):

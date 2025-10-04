@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}Shop Assistants - Baby & Kids Store{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-person-workspace"></i> Shop Assistants</h2>
+                <div>
+                    <a href="{% url 'accounts:shop-assistant-analytics' %}" class="btn btn-info me-2">
+                        <i class="bi bi-bar-chart"></i> Analytics
+                    </a>
+                    <a href="{% url 'accounts:shop-assistant-reports' %}" class="btn btn-warning me-2">
+                        <i class="bi bi-file-earmark-text"></i> Reports
+                    </a>
+                    <a href="{% url 'accounts:shop-assistant-add' %}" class="btn btn-success">
+                        <i class="bi bi-plus"></i> Add New Assistant
+                    </a>
+                </div>
+            </div>
+
+            <!-- Search and Filter Section -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-6">
+                            <label for="search" class="form-label">Search</label>
+                            <input type="text" class="form-control" id="search" name="search" 
+                                   value="{{ search_query }}" placeholder="Search by name, shop, or phone...">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="">All Status</option>
+                                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                                <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                            <a href="{% url 'accounts:shop-assistant-list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x"></i> Clear
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    {% if shop_assistants %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Contact</th>
+                                        <th>Joining Date</th>
+                                        <th>Status</th>
+                                        <th>Total Sales</th>
+                                        <th>Total Orders</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for assistant in shop_assistants %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ assistant.name }}</strong>
+                                        </td>
+                                        <td>{{ assistant.get_formatted_phone }}</td>
+                                        <td>{{ assistant.joining_date|date:"M d, Y" }}</td>
+                                        <td>
+                                            {% if assistant.is_active %}
+                                                <span class="badge bg-success">Active</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="currency-symbol">৳</span>{{ assistant.cached_total_sales|floatformat:2 }}
+                                        </td>
+                                        <td>{{ assistant.cached_total_orders }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{% url 'accounts:shop-assistant-detail' assistant.pk %}" 
+                                                   class="btn btn-outline-primary" title="View Details">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{% url 'accounts:shop-assistant-edit' assistant.pk %}" 
+                                                   class="btn btn-outline-warning" title="Edit">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <a href="{% url 'accounts:shop-assistant-delete' assistant.pk %}" 
+                                                   class="btn btn-outline-danger" title="Delete"
+                                                   onclick="return confirm('Are you sure you want to delete this assistant?')">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if is_paginated %}
+                            <nav aria-label="Shop assistants pagination">
+                                <ul class="pagination justify-content-center">
+                                    {% if page_obj.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">First</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a>
+                                        </li>
+                                    {% endif %}
+
+                                    <li class="page-item active">
+                                        <span class="page-link">
+                                            {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                                        </span>
+                                    </li>
+
+                                    {% if page_obj.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Last</a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-person-workspace display-1 text-muted"></i>
+                            <h4 class="mt-3">No Shop Assistants Found</h4>
+                            <p class="text-muted">
+                                {% if search_query or status_filter %}
+                                    No shop assistants match your search criteria.
+                                {% else %}
+                                    No shop assistants have been added yet.
+                                {% endif %}
+                            </p>
+                            <a href="{% url 'accounts:shop-assistant-add' %}" class="btn btn-success">
+                                <i class="bi bi-plus"></i> Add First Assistant
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

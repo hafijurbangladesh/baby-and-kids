@@ -14,7 +14,7 @@ from django.views.generic import (
     UpdateView, DeleteView, TemplateView
 )
 
-from .models import Customer, UserProfile
+from .models import Customer, UserProfile, ShopAssistant
 from .forms import CustomerForm, UserProfileForm
 
 class CustomerListView(LoginRequiredMixin, ListView):
@@ -209,3 +209,162 @@ class CustomerDeleteView(LoginRequiredMixin, DeleteView):
                 "Please delete all associated orders first if you really need to remove this customer."
             )
             return redirect('accounts:customer-detail', pk=kwargs['pk'])
+
+class SalespersonListView(LoginRequiredMixin, ListView):
+    model = UserProfile
+    template_name = 'accounts/salesperson_list.html'
+    context_object_name = 'salespersons'
+    paginate_by = 10
+
+    def get_queryset(self):
+        return UserProfile.objects.filter(
+            is_salesperson=True
+        ).select_related('user').order_by('user__first_name', 'user__username')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add sales statistics for each salesperson
+        from sales.models import Order
+        from django.db.models import Sum, Count
+        from decimal import Decimal
+        
+        for profile in context['salespersons']:
+            stats = Order.objects.filter(
+                salesperson=profile.user,
+                status='completed'
+            ).aggregate(
+                total_sales=Sum('total'),
+                total_orders=Count('id')
+            )
+            profile.total_sales = stats['total_sales'] or Decimal('0.00')
+            profile.total_orders = stats['total_orders'] or 0
+        
+        return context
+
+# Shop Assistant Views
+class ShopAssistantListView(LoginRequiredMixin, ListView):
+    model = ShopAssistant
+    template_name = 'accounts/shop_assistant_list.html'
+    context_object_name = 'shop_assistants'
+    paginate_by = 10
+
+    def get_queryset(self):
+        queryset = ShopAssistant.objects.all().order_by('-created_at')
+        
+        # Search functionality
+        search_query = self.request.GET.get('search', '').strip()
+        if search_query:
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) |
+                Q(contact_number__icontains=search_query)
+            )
+        
+        # Filter by active status
+        status_filter = self.request.GET.get('status', '')
+        if status_filter == 'active':
+            queryset = queryset.filter(is_active=True)
+        elif status_filter == 'inactive':
+            queryset = queryset.filter(is_active=False)
+        
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['search_query'] = self.request.GET.get('search', '')
+        context['status_filter'] = self.request.GET.get('status', '')
+        
+        # Add performance statistics for each assistant
+        for assistant in context['shop_assistants']:
+            assistant.cached_total_sales = assistant.total_sales
+            assistant.cached_total_orders = assistant.total_orders
+        
+        return context
+
+class ShopAssistantDetailView(LoginRequiredMixin, DetailView):
+    model = ShopAssistant
+    template_name = 'accounts/shop_assistant_detail.html'
+    context_object_name = 'shop_assistant'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        assistant = self.object
+        
+        # Get recent orders
+        from sales.models import Order
+        context['recent_orders'] = Order.objects.filter(
+            shop_assistant=assistant,
+            status='completed'
+        ).select_related('customer').order_by('-order_date')[:10]
+        
+        # Get performance statistics for different periods
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        
+        today = timezone.now().date()
+        week_ago = today - timedelta(days=7)
+        month_ago = today - timedelta(days=30)
+        
+        context['today_performance'] = assistant.get_performance_data(today, today)
+        context['week_performance'] = assistant.get_performance_data(week_ago, today)
+        context['month_performance'] = assistant.get_performance_data(month_ago, today)
+        context['overall_performance'] = assistant.get_performance_data()
+        
+        return context
+
+class ShopAssistantCreateView(LoginRequiredMixin, CreateView):
+    model = ShopAssistant
+    template_name = 'accounts/shop_assistant_form.html'
+    fields = ['name', 'contact_number', 'joining_date', 'is_active', 'address', 'notes']
+    
+    def get_success_url(self):
+        messages.success(self.request, f'Shop assistant "{self.object.name}" has been created successfully.')
+        return reverse_lazy('accounts:shop-assistant-detail', kwargs={'pk': self.object.pk})
+
+class ShopAssistantUpdateView(LoginRequiredMixin, UpdateView):
+    model = ShopAssistant
+    template_name = 'accounts/shop_assistant_form.html'
+    fields = ['name', 'contact_number', 'joining_date', 'is_active', 'address', 'notes']
+    
+    def get_success_url(self):
+        messages.success(self.request, f'Shop assistant "{self.object.name}" has been updated successfully.')
+        return reverse_lazy('accounts:shop-assistant-detail', kwargs={'pk': self.object.pk})
+
+class ShopAssistantDeleteView(LoginRequiredMixin, DeleteView):
+    model = ShopAssistant
+    template_name = 'accounts/shop_assistant_confirm_delete.html'
+    context_object_name = 'shop_assistant'
+    success_url = reverse_lazy('accounts:shop-assistant-list')
+    
+    def delete(self, request, *args, **kwargs):
+        assistant_name = self.get_object().name
+        messages.success(self.request, f'Shop assistant "{assistant_name}" has been deleted successfully.')
+        return super().delete(request, *args, **kwargs)
+
+@login_required
+def shop_assistant_search(request):
+    """API endpoint for searching shop assistants (for POS integration)"""
+    query = request.GET.get('q', '').strip()
+    page = int(request.GET.get('page', 1))
+    per_page = 10
+
+    assistants = ShopAssistant.objects.filter(is_active=True)
+    
+    if query:
+        assistants = assistants.filter(
+            Q(name__icontains=query) |
+            Q(assigned_shop__icontains=query)
+        )
+    
+    assistants = assistants.order_by('name')[(page - 1) * per_page:page * per_page]
+    
+    items = [{
+        'id': assistant.id,
+        'name': assistant.name,
+        'shop': assistant.assigned_shop,
+        'display_text': f"{assistant.name} ({assistant.assigned_shop})"
+    } for assistant in assistants]
+    
+    return JsonResponse({
+        'items': items,
+        'has_more': assistants.count() >= per_page
+    })

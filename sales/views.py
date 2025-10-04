@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.generic import ListView, DetailView, CreateView, TemplateView
 from django.http import JsonResponse, HttpResponseRedirect
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
@@ -34,25 +34,38 @@ class SaleListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        queryset = queryset.select_related('customer', 'salesperson')
+        queryset = queryset.select_related('customer', 'salesperson', 'shop_assistant')
 
         # Apply filters if provided
+        search = self.request.GET.get('search')
         start_date = self.request.GET.get('start_date')
         end_date = self.request.GET.get('end_date')
         status = self.request.GET.get('status')
+        shop_assistant = self.request.GET.get('shop_assistant')
 
+        if search:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(id__icontains=search) |  # Order number
+                Q(customer__name__icontains=search) |  # Customer name
+                Q(shop_assistant__name__icontains=search)  # Shop assistant name
+            )
         if start_date:
             queryset = queryset.filter(order_date__date__gte=start_date)
         if end_date:
             queryset = queryset.filter(order_date__date__lte=end_date)
         if status:
             queryset = queryset.filter(status=status)
+        if shop_assistant:
+            queryset = queryset.filter(shop_assistant_id=shop_assistant)
 
         return queryset
     
     def get_context_data(self, **kwargs):
+        from accounts.models import ShopAssistant
         context = super().get_context_data(**kwargs)
         context['order_status_choices'] = Order.ORDER_STATUS_CHOICES
+        context['shop_assistants'] = ShopAssistant.objects.filter(is_active=True).order_by('name')
         return context
 
 class OrderDetailView(LoginRequiredMixin, DetailView):
@@ -78,6 +91,9 @@ class POSView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
         context['customers'] = Customer.objects.all()
         context['categories'] = Category.objects.all()
         context['brands'] = Brand.objects.all()
+        # Add active shop assistants for POS selection
+        from accounts.models import ShopAssistant
+        context['shop_assistants'] = ShopAssistant.objects.filter(is_active=True).order_by('name')
         return context
 
 @login_required
@@ -106,6 +122,16 @@ def complete_sale(request):
                     order.customer = customer
                 except Customer.DoesNotExist:
                     # Customer ID invalid - continue as walk-in customer
+                    pass
+            
+            # Add shop assistant if provided
+            if data.get('shop_assistant'):
+                try:
+                    from accounts.models import ShopAssistant
+                    shop_assistant = ShopAssistant.objects.get(pk=data['shop_assistant'], is_active=True)
+                    order.shop_assistant = shop_assistant
+                except ShopAssistant.DoesNotExist:
+                    # Shop assistant ID invalid - continue without assistant
                     pass
             
             # Save order to get the ID
@@ -144,13 +170,13 @@ def complete_sale(request):
                     # TODO: Implement low stock notification system
                     pass
             
-            # Add tax
-            tax_amount = total_amount * decimal.Decimal('0.10')  # 10% tax
-            total_with_tax = total_amount + tax_amount
+            # No tax calculation - total equals subtotal
+            tax_amount = decimal.Decimal('0.00')
+            final_total = total_amount
             
             # Validate payment amount
             amount_paid = decimal.Decimal(str(data['amount_paid']))
-            if amount_paid < total_with_tax:
+            if amount_paid < final_total:
                 raise ValueError('Insufficient payment amount')
             
             # Create transaction
@@ -158,13 +184,13 @@ def complete_sale(request):
                 order=order,
                 payment_method=data['payment_method'],
                 amount_paid=amount_paid,
-                change_amount=amount_paid - total_with_tax
+                change_amount=amount_paid - final_total
             )
             
             # Update order totals and status
             order.subtotal = total_amount
             order.tax = tax_amount
-            order.total = total_with_tax
+            order.total = final_total
             order.status = 'completed'  # Set status to completed after successful payment
             order.save()
 
@@ -172,8 +198,8 @@ def complete_sale(request):
             order.refresh_from_db()
             
             # Check if the difference is more than 0.01 (1 cent)
-            if abs(order.total - total_with_tax) > decimal.Decimal('0.01'):
-                raise ValueError(f'Order total mismatch (Expected: {total_with_tax}, Got: {order.total}) - please try again')
+            if abs(order.total - final_total) > decimal.Decimal('0.01'):
+                raise ValueError(f'Order total mismatch (Expected: {final_total}, Got: {order.total}) - please try again')
             
             # Update customer's total purchase value
             if order.customer:
@@ -355,3 +381,31 @@ def create_order(request):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required
+def search_customers(request):
+    """Search customers by name or phone number for POS autocomplete"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Only GET method allowed'}, status=405)
+    
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:  # Require at least 2 characters
+        return JsonResponse({'customers': []})
+    
+    # Search by name or phone number
+    customers = Customer.objects.filter(
+        Q(name__icontains=query) | 
+        Q(phone_number__icontains=query)
+    ).order_by('name')[:10]  # Limit to 10 results
+    
+    results = []
+    for customer in customers:
+        results.append({
+            'id': customer.id,
+            'name': customer.name,
+            'phone_number': customer.get_formatted_phone(),
+            'display_text': f"{customer.name} - {customer.get_formatted_phone()}"
+        })
+    
+    return JsonResponse({'customers': results})

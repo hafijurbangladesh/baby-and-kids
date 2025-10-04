@@ -3,6 +3,18 @@
 {% block title %}{{ product.name }} - Kids Store{% endblock %}
 
 {% block content %}
+<!-- Display Messages -->
+{% if messages %}
+<div class="alert-container mb-4">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <div class="row">
     <div class="col-md-4">
         <div class="card mb-4">
@@ -111,20 +123,24 @@
                 <h5 class="modal-title">Update Stock</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="{% url 'inventory:update-stock' product.pk %}">
+            <form method="post" action="{% url 'inventory:update-stock' product.pk %}" id="stockUpdateForm">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Current Stock: {{ product.inventory.quantity }}</label>
+                        <label class="form-label">Current Stock: <strong>{{ product.inventory.quantity }} units</strong></label>
                     </div>
                     <div class="mb-3">
                         <label for="adjustment" class="form-label">Stock Adjustment</label>
-                        <input type="number" class="form-control" id="adjustment" name="adjustment" required>
-                        <div class="form-text">Use positive numbers to add stock, negative to remove.</div>
+                        <input type="number" class="form-control" id="adjustment" name="adjustment" required placeholder="e.g. +10 or -5">
+                        <div class="form-text">
+                            <strong>Examples:</strong><br>
+                            • Enter <code>10</code> to add 10 units<br>
+                            • Enter <code>-5</code> to remove 5 units
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="reason" class="form-label">Reason for Adjustment</label>
-                        <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>
+                        <textarea class="form-control" id="reason" name="reason" rows="3" required placeholder="e.g. Received new stock, Damaged items, Stock correction..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -132,6 +148,13 @@
                     <button type="submit" class="btn btn-primary">Update Stock</button>
                 </div>
             </form>
+            
+            <script>
+                // Reset form when modal is hidden
+                document.getElementById('updateStockModal').addEventListener('hidden.bs.modal', function () {
+                    document.getElementById('stockUpdateForm').reset();
+                });
+            </script>
         </div>
     </div>
 </div>

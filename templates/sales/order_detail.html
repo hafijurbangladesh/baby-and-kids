@@ -69,17 +69,7 @@
 
             <div class="card-body">
                 <div class="row mb-4">
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Customer Information</h6>
-                        <h5>{{ order.customer.name }}</h5>
-                        {% if order.customer.phone_number %}
-                        <p class="mb-1">Phone: {{ order.customer.phone_number }}</p>
-                        {% endif %}
-                        {% if order.customer.email %}
-                        <p class="mb-1">Email: {{ order.customer.email }}</p>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-6 text-md-end">
+                    <div class="col-md-12 text-md-end">
                         <h6 class="text-muted">Order Details</h6>
                         <p class="mb-1">Date: {{ order.order_date|date:"M d, Y H:i" }}</p>
                         <p class="mb-1">Status: 
@@ -87,7 +77,6 @@
                                 {{ order.get_status_display }}
                             </span>
                         </p>
-                        <p class="mb-1">Salesperson: {% if order.salesperson.get_full_name %}{{ order.salesperson.get_full_name }}{% else %}{{ order.salesperson.username }}{% endif %}</p>
                     </div>
                 </div>
 
@@ -118,10 +107,6 @@
                             <tr>
                                 <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
                                 <td class="text-end">৳{{ order.subtotal|floatformat:2 }}</td>
-                            </tr>
-                            <tr>
-                                <td colspan="3" class="text-end"><strong>Tax (10%):</strong></td>
-                                <td class="text-end">৳{{ order.tax|floatformat:2 }}</td>
                             </tr>
                             <tr>
                                 <td colspan="3" class="text-end"><strong>Total:</strong></td>

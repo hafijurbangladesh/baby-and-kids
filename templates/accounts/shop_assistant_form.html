@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if object %}Edit Shop Assistant{% else %}Add Shop Assistant{% endif %} - Baby & Kids Store
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-person-workspace"></i>
+                        {% if object %}Edit Shop Assistant{% else %}Add New Shop Assistant{% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <!-- Basic Information -->
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.name.id_for_label }}" class="form-label">
+                                        Full Name <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}
+                                        <div class="text-danger small">{{ form.name.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="{{ form.contact_number.id_for_label }}" class="form-label">
+                                        Contact Number
+                                    </label>
+                                    {{ form.contact_number }}
+                                    <div class="form-text">Format: +8801XXXXXXXXX or 01XXXXXXXXX</div>
+                                    {% if form.contact_number.errors %}
+                                        <div class="text-danger small">{{ form.contact_number.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="{{ form.joining_date.id_for_label }}" class="form-label">
+                                        Joining Date <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.joining_date }}
+                                    {% if form.joining_date.errors %}
+                                        <div class="text-danger small">{{ form.joining_date.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.assigned_shop.id_for_label }}" class="form-label">
+                                        Assigned Shop/Branch <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.assigned_shop }}
+                                    {% if form.assigned_shop.errors %}
+                                        <div class="text-danger small">{{ form.assigned_shop.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        {{ form.is_active }}
+                                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                            Active Assistant
+                                        </label>
+                                    </div>
+                                    <div class="form-text">Inactive assistants won't appear in POS selections</div>
+                                    {% if form.is_active.errors %}
+                                        <div class="text-danger small">{{ form.is_active.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Address -->
+                        <div class="mb-3">
+                            <label for="{{ form.address.id_for_label }}" class="form-label">
+                                Address
+                            </label>
+                            {{ form.address }}
+                            {% if form.address.errors %}
+                                <div class="text-danger small">{{ form.address.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                Notes
+                            </label>
+                            {{ form.notes }}
+                            <div class="form-text">Any additional information or comments</div>
+                            {% if form.notes.errors %}
+                                <div class="text-danger small">{{ form.notes.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'accounts:shop-assistant-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to List
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check"></i>
+                                {% if object %}Update Assistant{% else %}Create Assistant{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control, .form-select {
+        border-radius: 0.375rem;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    textarea.form-control {
+        min-height: 80px;
+    }
+</style>
+{% endblock %}

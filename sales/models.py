@@ -15,6 +15,13 @@ class Order(models.Model):
 
     customer = models.ForeignKey('accounts.Customer', null=True, on_delete=models.PROTECT)
     salesperson = models.ForeignKey(User, on_delete=models.PROTECT)
+    shop_assistant = models.ForeignKey(
+        'accounts.ShopAssistant', 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL,
+        help_text="Shop assistant who helped with this sale"
+    )
     order_date = models.DateTimeField(auto_now_add=True)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], default=0)
     tax = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], default=0)
@@ -34,10 +41,9 @@ class Order(models.Model):
                 (item.price * item.quantity).quantize(Decimal('0.01'))
                 for item in self.orderitem_set.all()
             )
-            # Calculate tax with 2 decimal precision
-            self.tax = (self.subtotal * Decimal('0.10')).quantize(Decimal('0.01'))  # 10% tax
-            # Calculate total with 2 decimal precision
-            self.total = (self.subtotal + self.tax).quantize(Decimal('0.01'))
+            # No tax calculation - total equals subtotal
+            self.tax = Decimal('0.00')
+            self.total = self.subtotal
         return self.subtotal, self.tax, self.total
 
     def save(self, *args, **kwargs):

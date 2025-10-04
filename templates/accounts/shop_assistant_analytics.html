@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+
+{% block title %}Shop Assistant Analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-chart-line"></i> Shop Assistant Analytics</h2>
+                <div class="btn-group" role="group">
+                    <a href="{% url 'accounts:shop-assistant-analytics' %}?period=daily" 
+                       class="btn btn-outline-primary {% if period == 'daily' %}active{% endif %}">Daily</a>
+                    <a href="{% url 'accounts:shop-assistant-analytics' %}?period=weekly" 
+                       class="btn btn-outline-primary {% if period == 'weekly' %}active{% endif %}">Weekly</a>
+                    <a href="{% url 'accounts:shop-assistant-analytics' %}?period=monthly" 
+                       class="btn btn-outline-primary {% if period == 'monthly' %}active{% endif %}">Monthly</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-area"></i> Sales Performance Comparison</h5>
+                    <small class="text-muted">{{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}</small>
+                </div>
+                <div class="card-body">
+                    <canvas id="performanceChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Performers -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-trophy"></i> Top Performers</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Assistant</th>
+                                    <th>Sales</th>
+                                    <th>Orders</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for assistant in top_performers %}
+                                <tr>
+                                    <td>
+                                        <span class="badge badge-{% if forloop.counter == 1 %}warning{% elif forloop.counter == 2 %}secondary{% elif forloop.counter == 3 %}dark{% else %}light{% endif %}">
+                                            #{{ forloop.counter }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'accounts:shop-assistant-detail' assistant.pk %}">{{ assistant.name }}</a>
+                                    </td>
+                                    <td>৳{{ assistant.period_sales|floatformat:0 }}</td>
+                                    <td>{{ assistant.period_orders }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No sales data available</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Summary -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-users"></i> Performance Summary</h5>
+                </div>
+                <div class="card-body">
+                    {% for item in assistants_performance %}
+                    <div class="mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ item.assistant.name }}</h6>
+                            </div>
+                            <div class="text-right">
+                                <span class="h6 text-success">৳{{ item.data.total_sales|floatformat:0 }}</span>
+                                <small class="text-muted d-block">{{ item.data.total_orders }} orders</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Performance Bar -->
+                        <div class="mt-2">
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-success" 
+                                     style="width: {{ item.data.performance_percentage|default:0 }}%"></div>
+                            </div>
+                            <small class="text-muted">
+                                Avg: ৳{{ item.data.avg_order_value|floatformat:0 }} per order
+                            </small>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted">No performance data available.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Performance Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-table"></i> Detailed Performance Report</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Assistant</th>
+                                    <th>Joining Date</th>
+                                    <th>Total Sales</th>
+                                    <th>Total Orders</th>
+                                    <th>Avg Order Value</th>
+                                    <th>Performance</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in assistants_performance %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'accounts:shop-assistant-detail' item.assistant.pk %}">
+                                            {{ item.assistant.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ item.assistant.joining_date|date:"M d, Y" }}</td>
+                                    <td class="text-success font-weight-bold">৳{{ item.data.total_sales|floatformat:0 }}</td>
+                                    <td>{{ item.data.total_orders }}</td>
+                                    <td>৳{{ item.data.avg_order_value|floatformat:0 }}</td>
+                                    <td>
+                                        <div class="progress" style="width: 100px; height: 20px;">
+                                            <div class="progress-bar 
+                                                {% if item.data.performance_percentage >= 80 %}bg-success
+                                                {% elif item.data.performance_percentage >= 60 %}bg-warning
+                                                {% else %}bg-danger{% endif %}"
+                                                 style="width: {{ item.data.performance_percentage|default:0 }}%">
+                                                {{ item.data.performance_percentage|default:0|floatformat:0 }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-{% if item.assistant.is_active %}success{% else %}secondary{% endif %}">
+                                            {% if item.assistant.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">No shop assistants found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const chartData = {{ chart_data|safe }};
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value, index, values) {
+                            return '৳' + value.toLocaleString();
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ৳' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                },
+                legend: {
+                    position: 'top',
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

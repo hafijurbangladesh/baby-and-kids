@@ -47,10 +47,37 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="{% url 'sales:sale-list' %}">
+                            <i class="bi bi-clock-history"></i> Sales History
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="{% url 'accounts:customer-list' %}">
                             <i class="bi bi-people"></i> Customers
                         </a>
                     </li>
+                    {% if user.is_staff %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-people-fill"></i> Staff
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'accounts:salesperson-list' %}">
+                                <i class="bi bi-person-badge"></i> Salespersons
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:shop-assistant-list' %}">
+                                <i class="bi bi-person-workspace"></i> Shop Assistants
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:shop-assistant-analytics' %}">
+                                <i class="bi bi-bar-chart"></i> Assistant Analytics
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:shop-assistant-reports' %}">
+                                <i class="bi bi-file-earmark-text"></i> Assistant Reports
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
                     {% if user.is_staff %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">

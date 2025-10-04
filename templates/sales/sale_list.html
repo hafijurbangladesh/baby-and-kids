@@ -6,13 +6,63 @@
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Sales History</h2>
-        <a href="{% url 'sales:pos' %}" class="btn btn-primary">
-            <i class="bi bi-cart-plus"></i> New Sale
-        </a>
+        <div>
+            <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#filterModal">
+                <i class="bi bi-funnel"></i> Filter
+            </button>
+            <a href="{% url 'sales:pos' %}" class="btn btn-primary">
+                <i class="bi bi-cart-plus"></i> New Sale
+            </a>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="card mb-3">
+        <div class="card-body py-3">
+            <form method="get" class="d-flex">
+                <div class="input-group">
+                    <input type="text" 
+                           name="search" 
+                           class="form-control" 
+                           placeholder="Search by order #, customer name, or shop assistant..." 
+                           value="{{ request.GET.search }}"
+                           aria-label="Search orders">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                    {% if request.GET.search %}
+                    <a href="{% url 'sales:sale-list' %}" class="btn btn-outline-danger" title="Clear search">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                    {% endif %}
+                </div>
+                <!-- Preserve other filter parameters -->
+                {% if request.GET.start_date %}
+                <input type="hidden" name="start_date" value="{{ request.GET.start_date }}">
+                {% endif %}
+                {% if request.GET.end_date %}
+                <input type="hidden" name="end_date" value="{{ request.GET.end_date }}">
+                {% endif %}
+                {% if request.GET.status %}
+                <input type="hidden" name="status" value="{{ request.GET.status }}">
+                {% endif %}
+                {% if request.GET.shop_assistant %}
+                <input type="hidden" name="shop_assistant" value="{{ request.GET.shop_assistant }}">
+                {% endif %}
+            </form>
+        </div>
     </div>
 
     <div class="card">
         <div class="card-body">
+            {% if request.GET.search %}
+            <div class="mb-3">
+                <small class="text-muted">
+                    <i class="bi bi-search"></i> Search results for "<strong>{{ request.GET.search }}</strong>" 
+                    - {{ page_obj.paginator.count }} order{{ page_obj.paginator.count|pluralize }} found
+                </small>
+            </div>
+            {% endif %}
             <div class="table-responsive">
                 <table class="table table-striped">
                     <thead>
@@ -20,6 +70,7 @@
                             <th>Order #</th>
                             <th>Date</th>
                             <th>Customer</th>
+                            <th>Shop Assistant</th>
                             <th>Items</th>
                             <th>Total</th>
                             <th>Status</th>
@@ -38,6 +89,15 @@
                                     </a>
                                 {% else %}
                                     <span class="text-muted">Walk-in Customer</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if order.shop_assistant %}
+                                    <a href="{% url 'accounts:shop-assistant-detail' order.shop_assistant.pk %}">
+                                        {{ order.shop_assistant.name }}
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">Not Assigned</span>
                                 {% endif %}
                             </td>
                             <td>{{ order.orderitem_set.count }} item(s)</td>
@@ -148,6 +208,21 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Shop Assistant</label>
+                        <select name="shop_assistant" class="form-select">
+                            <option value="">All</option>
+                            {% for assistant in shop_assistants %}
+                            <option value="{{ assistant.id }}" {% if request.GET.shop_assistant == assistant.id|stringformat:"s" %}selected{% endif %}>
+                                {{ assistant.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <!-- Preserve search parameter -->
+                    {% if request.GET.search %}
+                    <input type="hidden" name="search" value="{{ request.GET.search }}">
+                    {% endif %}
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Apply Filters</button>
                     </div>

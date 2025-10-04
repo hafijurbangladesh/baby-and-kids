@@ -1,12 +1,12 @@
 // Global variables
 let cart = [];
-const TAX_RATE = 0.10;
 let quantityModal = null;
 let paymentModal = null;
 
 // Main initialization
 $(document).ready(function() {
     console.log('Initializing POS system...');
+    console.log('DOM ready, jQuery version:', $.fn.jquery);
     initializeModals();
     initializeUI();
     initializeEventListeners();
@@ -23,12 +23,8 @@ function initializeModals() {
 function initializeUI() {
     console.log('Initializing UI components...');
     
-    // Initialize Select2 for customer selection
-    $('#customer-select').select2({
-        placeholder: 'Select a customer',
-        allowClear: true,
-        width: '100%'
-    });
+    // Initialize customer search functionality
+    initializeCustomerSearch();
 
     // Initialize Select2 for filters
     $('#category-filter').select2({
@@ -48,10 +44,16 @@ function initializeUI() {
 function initializeEventListeners() {
     console.log('Setting up event listeners...');
     
-    // Search and filter events
-    $('#product-search').on('input', debounce(filterProducts, 300));
-    $('#category-filter').on('change', filterProducts);
-    $('#brand-filter').on('change', filterProducts);
+    // Search and filter events (only if elements exist)
+    if ($('#product-search').length > 0) {
+        $('#product-search').on('input', debounce(filterProducts, 300));
+    }
+    if ($('#category-filter').length > 0) {
+        $('#category-filter').on('change', filterProducts);
+    }
+    if ($('#brand-filter').length > 0) {
+        $('#brand-filter').on('change', filterProducts);
+    }
 
     // Product selection
     $('#products-container').on('click', '.pos-product-card', function(e) {
@@ -86,13 +88,20 @@ function initializeEventListeners() {
 // Filter products based on search and filters
 function filterProducts() {
     console.log('Filtering products...');
-    const searchTerm = $('#product-search').val().toLowerCase();
+    
+    // Safety check - only run if product elements exist
+    if ($('#product-search').length === 0 || $('.product-item').length === 0) {
+        console.log('Product search elements not found, skipping filter');
+        return;
+    }
+    
+    const searchTerm = ($('#product-search').val() || '').toLowerCase();
     const categoryId = $('#category-filter').val();
     const brandId = $('#brand-filter').val();
 
     $('.product-item').each(function() {
         const item = $(this);
-        const productName = item.find('.card-title').text().toLowerCase();
+        const productName = (item.find('.card-title').text() || '').toLowerCase();
         const productCategory = item.data('category');
         const productBrand = item.data('brand');
 
@@ -225,11 +234,9 @@ function updateCartDisplay() {
 
     // Update totals with proper precision
     const subtotal = cart.reduce((sum, item) => sum + parseFloat((item.price * item.quantity).toFixed(2)), 0);
-    const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
-    const total = parseFloat((subtotal + tax).toFixed(2));
+    const total = parseFloat(subtotal.toFixed(2));
 
     $('#subtotal').text(`৳${subtotal.toFixed(2)}`);
-    $('#tax').text(`৳${tax.toFixed(2)}`);
     $('#total').text(`৳${total.toFixed(2)}`);
     
     // Enable/disable complete sale button
@@ -242,8 +249,7 @@ function showPaymentModal() {
     
     // Calculate totals with proper precision
     const subtotal = cart.reduce((sum, item) => sum + (parseFloat((item.price * item.quantity).toFixed(2))), 0);
-    const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
-    const total = parseFloat((subtotal + tax).toFixed(2));
+    const total = parseFloat(subtotal.toFixed(2));
     
     $('#payment-total').text(`৳${total.toFixed(2)}`);
     $('#amount-received').val('').removeClass('is-invalid');
@@ -278,7 +284,7 @@ function showPaymentModal() {
 function processPayment(total) {
     console.log('Processing payment...');
     
-    const customerId = $('#customer-select').val();
+    const customerId = $('#customer-id').val();
     const paymentMethod = $('#payment-method').val();
     const amountPaid = parseFloat($('#amount-received').val());
 
@@ -288,8 +294,10 @@ function processPayment(total) {
     }
 
     // Prepare order data
+    const shopAssistantId = $('#shop-assistant-select').val();
     const orderData = {
         customer: customerId || null,
+        shop_assistant: shopAssistantId || null,
         payment_method: paymentMethod,
         amount_paid: amountPaid,
         items: cart.map(item => ({
@@ -320,7 +328,11 @@ function processPayment(total) {
                     // Clear cart and reset form
                     cart = [];
                     updateCartDisplay();
-                    $('#customer-select').val(null).trigger('change');
+                    // Reset customer search
+                    $('#customer-search').val('');
+                    $('#customer-id').val('');
+                    $('#selected-customer').text('Walk-in Customer');
+                    $('#shop-assistant-select').val('');
                     $('#payment-method').val('cash');
 
                     // Close modal
@@ -432,11 +444,141 @@ function showErrorMessage(message) {
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
+        const context = this;
         const later = () => {
             clearTimeout(timeout);
-            func(...args);
+            func.apply(context, args);
         };
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+}
+
+// Initialize customer search functionality
+function initializeCustomerSearch() {
+    console.log('Initializing customer search...');
+    
+    const customerSearch = $('#customer-search');
+    const customerDropdown = $('#customer-dropdown');
+    const customerIdInput = $('#customer-id');
+    const selectedCustomerSpan = $('#selected-customer');
+    
+    console.log('Customer search elements:', {
+        searchInput: customerSearch.length,
+        dropdown: customerDropdown.length,
+        hiddenInput: customerIdInput.length,
+        selectedSpan: selectedCustomerSpan.length
+    });
+    
+    // Check if elements exist before adding event listeners
+    if (customerSearch.length === 0) {
+        console.error('Customer search input not found! ID: #customer-search');
+        return;
+    }
+    
+    // Search customers with debounce
+    customerSearch.on('input', debounce(function() {
+        const query = ($(this).val() || '').trim();
+        console.log('Customer search input:', query);
+        
+        if (query.length < 2) {
+            customerDropdown.hide().empty();
+            return;
+        }
+        
+        console.log('Making AJAX request for customer search...');
+        // Make AJAX request to search customers
+        $.ajax({
+            url: '/sales/api/search-customers/',
+            type: 'GET',
+            data: { q: query },
+            success: function(response) {
+                console.log('Customer search success:', response);
+                displayCustomerResults(response.customers);
+            },
+            error: function(xhr, status, error) {
+                console.error('Customer search failed:', error, xhr.responseText);
+                
+                if (xhr.status === 302 || xhr.status === 401) {
+                    // Authentication required
+                    customerDropdown.html('<div class="dropdown-item-text text-warning">Please log in to search customers</div>');
+                } else {
+                    customerDropdown.html('<div class="dropdown-item-text text-danger">Search failed. Check console for details.</div>');
+                }
+                customerDropdown.show();
+            }
+        });
+    }, 300));
+    
+    // Handle input focus
+    customerSearch.on('focus', function() {
+        const query = ($(this).val() || '').trim();
+        if (query.length >= 2) {
+            customerDropdown.show();
+        }
+    });
+    
+    // Handle clicking outside to hide dropdown
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#customer-search, #customer-dropdown').length) {
+            customerDropdown.hide();
+        }
+    });
+    
+    // Clear customer selection
+    customerSearch.on('keydown', function(e) {
+        // Clear selection if user starts typing again
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') {
+            customerIdInput.val('');
+            selectedCustomerSpan.text('Walk-in Customer');
+        }
+    });
+}
+
+// Display customer search results
+function displayCustomerResults(customers) {
+    const customerDropdown = $('#customer-dropdown');
+    
+    if (customers.length === 0) {
+        customerDropdown.html('<div class="dropdown-item-text text-muted">No customers found</div>');
+        customerDropdown.show();
+        return;
+    }
+    
+    let html = '';
+    customers.forEach(function(customer) {
+        html += `
+            <a class="dropdown-item customer-result" 
+               href="#" 
+               data-customer-id="${customer.id}"
+               data-customer-name="${customer.name}"
+               data-customer-phone="${customer.phone_number}">
+                <div class="d-flex justify-content-between">
+                    <span class="fw-bold">${customer.name}</span>
+                    <small class="text-muted">${customer.phone_number}</small>
+                </div>
+            </a>
+        `;
+    });
+    
+    customerDropdown.html(html).show();
+    
+    // Handle customer selection
+    $('.customer-result').on('click', function(e) {
+        e.preventDefault();
+        
+        const customerId = $(this).data('customer-id');
+        const customerName = $(this).data('customer-name');
+        const customerPhone = $(this).data('customer-phone');
+        
+        // Update form values
+        $('#customer-id').val(customerId);
+        $('#customer-search').val(`${customerName} - ${customerPhone}`);
+        $('#selected-customer').text(`${customerName} (${customerPhone})`);
+        
+        // Hide dropdown
+        customerDropdown.hide();
+        
+        console.log('Customer selected:', customerName, customerId);
+    });
 }

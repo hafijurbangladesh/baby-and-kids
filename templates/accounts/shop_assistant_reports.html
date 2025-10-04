@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}Shop Assistant Reports{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-file-alt"></i> Shop Assistant Reports</h2>
+                <div>
+                    <button class="btn btn-primary" onclick="window.print()">
+                        <i class="fas fa-print"></i> Print Report
+                    </button>
+                    <a href="{% url 'accounts:shop-assistant-analytics' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-chart-line"></i> View Analytics
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ total_assistants }}</h4>
+                            <p class="card-text">Total Assistants</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ active_assistants }}</h4>
+                            <p class="card-text">Active Assistants</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-user-check fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ assistant_stats|length }}</h4>
+                            <p class="card-text">Performers Tracked</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-bar fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ report_date|date:"M d" }}</h4>
+                            <p class="card-text">Report Date</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Individual Performance Report -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> Individual Performance Report (Last 30 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Assistant Name</th>
+                                    <th>Shop/Branch</th>
+                                    <th>Contact</th>
+                                    <th>Total Sales</th>
+                                    <th>Total Orders</th>
+                                    <th>Avg Order Value</th>
+                                    <th>Performance Score</th>
+                                    <th>Grade</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in assistant_stats %}
+                                <tr>
+                                    <td>
+                                        <span class="badge badge-{% if forloop.counter <= 3 %}success{% elif forloop.counter <= 5 %}warning{% else %}secondary{% endif %} badge-pill">
+                                            #{{ forloop.counter }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ stat.assistant.name }}</strong>
+                                        <small class="text-muted d-block">
+                                            Joined: {{ stat.assistant.joining_date|date:"M d, Y" }}
+                                        </small>
+                                    </td>
+                                    <td>{{ stat.assistant.assigned_shop|default:"Not Assigned" }}</td>
+                                    <td>{{ stat.assistant.contact_number }}</td>
+                                    <td class="text-success font-weight-bold">৳{{ stat.total_sales|floatformat:0 }}</td>
+                                    <td>{{ stat.total_orders }}</td>
+                                    <td>৳{{ stat.avg_order_value|floatformat:0 }}</td>
+                                    <td>{{ stat.performance_score|floatformat:1 }}</td>
+                                    <td>
+                                        {% if stat.performance_score >= 1000 %}
+                                            <span class="badge badge-success">A+</span>
+                                        {% elif stat.performance_score >= 750 %}
+                                            <span class="badge badge-success">A</span>
+                                        {% elif stat.performance_score >= 500 %}
+                                            <span class="badge badge-warning">B</span>
+                                        {% elif stat.performance_score >= 250 %}
+                                            <span class="badge badge-info">C</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">D</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted">No performance data available.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Report Footer -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Report Summary</h6>
+                    <p class="card-text">
+                        This report shows the performance analysis of all shop assistants for the last 30 days.
+                        Performance scores are calculated based on total sales (70%) and number of orders (30%).
+                    </p>
+                    <small class="text-muted">
+                        Generated on: {{ report_date|date:"F d, Y \a\t g:i A" }} | 
+                        Total Active Assistants: {{ active_assistants }} | 
+                        Reporting Period: Last 30 Days
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .no-print {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #dee2e6 !important;
+        break-inside: avoid;
+    }
+    
+    .bg-primary, .bg-success, .bg-info, .bg-warning {
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+}
+
+.border-left-primary {
+    border-left: 0.25rem solid #007bff !important;
+}
+</style>
+{% endblock %}

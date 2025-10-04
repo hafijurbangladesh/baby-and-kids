@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Shop Assistant - Baby & Kids Store{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> Confirm Deletion
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <strong>Warning!</strong> This action cannot be undone.
+                    </div>
+                    
+                    <p>Are you sure you want to delete the shop assistant:</p>
+                    
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ shop_assistant.name }}</h5>
+                            <p class="card-text">
+                                <strong>Assigned Shop:</strong> {{ shop_assistant.assigned_shop }}<br>
+                                <strong>Contact:</strong> {{ shop_assistant.get_formatted_phone }}<br>
+                                <strong>Joining Date:</strong> {{ shop_assistant.joining_date|date:"F d, Y" }}
+                            </p>
+                            
+                            {% if shop_assistant.total_orders > 0 %}
+                            <div class="alert alert-info mb-0">
+                                <strong>Note:</strong> This assistant has been linked to {{ shop_assistant.total_orders }} order(s) 
+                                totaling ৳{{ shop_assistant.total_sales|floatformat:2 }}. 
+                                The orders will not be deleted, but the assistant link will be removed.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'accounts:shop-assistant-detail' shop_assistant.pk %}" 
+                               class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Yes, Delete Assistant
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
